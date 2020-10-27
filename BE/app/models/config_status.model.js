@@ -1,10 +1,7 @@
 module.exports = mongoose => {
     var schema = mongoose.Schema({
-        voucher_id: Number,
-        voucher_title: String,
-        voucher_value: Number,
-        voucher_qty: Number,
-        voucher_status: Number
+        config_status_id: Number,
+        config_status_title: String
     }, { timestamps: false });
 
     schema.method("toJSON", function() {
@@ -13,6 +10,7 @@ module.exports = mongoose => {
         return object;
     });
 
-    const Voucher = mongoose.model("voucher", schema);
-    return Voucher;
+    const ConfigStatus = mongoose.model("config_status", schema);
+
+    return ConfigStatus;
 };

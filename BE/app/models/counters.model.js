@@ -10,6 +10,6 @@ module.exports = mongoose => {
         return object;
     });
 
-    const CustomerVoucher = mongoose.model("counters", schema);
-    return CustomerVoucher;
+    const Counters = mongoose.model("counters", schema);
+    return Counters;
 };

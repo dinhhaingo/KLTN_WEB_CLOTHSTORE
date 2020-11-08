@@ -21,17 +21,18 @@ db.productType = require("../product_type.model.js")(mongoose);
 db.province = require("../province.model.js")(mongoose);
 db.voucher = require("../voucher.model.js")(mongoose);
 db.counters = require("../counters.model.js")(mongoose);
+db.employee = require("../employee.model.js")(mongoose);
 
-// db.autoIncremet = require("../auto_increment.js")(mongoose);
-db.autoIncrement = {
-    getNextSequence: function(name) {
-        var ret = db.counters.findAndModify({
-            query: { _id: name },
-            update: { $inc: { seq: 1 } },
-            new: true
-        });
-        return ret.seq;
-    }
+db.autoIncrement = async (name) => {
+        let result = await db.counters.findOne({ id: name })
+        let temp = result.seq + 1
+        await db.counters.findOneAndUpdate(
+            { id: name },
+            { seq: temp },
+            { useFindAndModify: false }
+        );
+
+        return temp
 }
 
 module.exports = db;

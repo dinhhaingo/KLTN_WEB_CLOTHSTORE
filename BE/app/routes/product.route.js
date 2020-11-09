@@ -1,22 +1,23 @@
+var express = require('express')
+var cors = require('cors')
+var app = express()
+
+// app.use(cors());
+
 module.exports = app => {
     const product = require("../controllers/product.controller.js");
 
     var router = require("express").Router();
 
-    // Create a new Tutorial
-    router.post("/", product.create);
+    router.post("/create", cors(), product.create);
 
-    // Retrieve all post
-    router.get("/", product.findAll);
+    router.get("/find-all", cors(), product.findAll);
 
-    // Retrieve all published post
-    router.get("/published", product.findAllPublished);
+    router.get("/get-all", cors(), product.getAll);
 
-    // Delete a Tutorial with id
-    router.delete("/:id", product.delete);
+    router.put("/update-product", cors(), product.updateProduct);
 
-    // Create a new Tutorial
-    router.delete("/", product.deleteAll);
+    router.put("/update-image", cors(), product.updateImage);
 
-    app.use('/api/product', router);
+    app.use('/product', router);
 };

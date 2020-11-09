@@ -1,3 +1,15 @@
+var express = require('express')
+const cors = require("cors");
+
+const app = express();
+
+var corsOptions = {
+    origin: "http://192.168.0.104:4200",
+    optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
 module.exports = app => {
     const employee = require("../controllers/employee.controller.js");
 
@@ -15,7 +27,7 @@ module.exports = app => {
 
     router.put("/update-image", employee.updateImage);
 
-    router.post("/login", employee.login);
+    router.post("/login", cors(corsOptions), employee.login);
 
     router.put("/refresh-token", employee.refreshToken);
 

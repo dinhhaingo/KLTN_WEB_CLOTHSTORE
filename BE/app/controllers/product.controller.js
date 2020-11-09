@@ -3,54 +3,64 @@ const dbase = require("../models/index");
 const PRODUCT = dbase.product;
 const mongoose = require("mongoose");
 const {cloudinary} = require('../config/cd.config');
+const encode = require('nodejs-base64-encode');
+var base64 = require('base-64');
 
 dbase.mongoose = mongoose;
 
-// Create and Save a new Tutorial
 exports.create = async (req, res) => {
-    // Validate request
-    const {name, qty, type, size, unitPrice, paidPrice, discount, description, images, status} = req.body;
-    if (!name) {
+    const {product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_paid_price, product_discount, product_description, product_images, product_status} = req.body.fashionCreate;
+    
+    if (!product_name) {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
     }
-    const pro = await PRODUCT.findOne({name});
+    
+    const pro = await PRODUCT.findOne({product_name});
     if(pro){
         return res.status(400).json({msg: "Sản phẩm đã tồn tại!"})
     }
+    
+    let message = '';
+    let arrImage = [];
+    console.log('images: ', product_images);
+    if(product_images){
+        console.log('lllllll');
 
-    var arrImage = [];
-    images.forEach(async(image) => {
-        try {
-            const uploadImage = await cloudinary.uploader.upload(image, {
-                upload_preset: 'ml_default'
-            });
-            arrImage.push(uploadImage.url);
-            console.log(uploadImage);
-        } catch (error) {
-            console.log(error);
-        }
-    });
+        product_images.forEach(async(image) => {
+            try {
+                // image = await base64.encode(image);
+                const uploadImage = await cloudinary.uploader.upload(image);
+                arrImage.push(uploadImage.url);
+                console.log(uploadImage);
+            } catch (error) {
+                message = "Không thể upload hình ảnh!";
+            }
+        });
+    }
 
     // Create a Tutorial
     const product = new PRODUCT({
         product_id: await dbase.autoIncrement('product'),
-        product_name: name,
-        product_qty: qty,
-        product_type_fk: type,
-        product_size_fk: size,
-        product_unit_price: unitPrice,
-        product_paid_price: paidPrice,
-        product_discount: discount,
-        product_description: description,
+        product_name: product_name,
+        product_qty: product_qty,
+        product_type_fk: product_type_fk,
+        product_size_fk: product_size_fk,
+        product_unit_price: product_unit_price,
+        product_paid_price: product_paid_price || product_unit_price,
+        product_discount: product_discount,
+        product_description: product_description,
         product_images: arrImage,
-        product_status: status
+        product_status: product_status
     });
     // Save Tutorial in the database
     product
         .save(product)
         .then(async(data) => {
-            await res.send(data);
+            await res.json({
+                data: data,
+                message: message
+            });
         })
         .catch(async(err) => {
             await res.status(500).send({
@@ -99,12 +109,12 @@ exports.updateProduct = async(req, res) => {
             message: "Data to update can not be empty!"
         });
     }
-    const {id, name, qty, type, size, unitPrice, paidPrice, discount, description, images, status, isChange} = req.body;
-
-    if (images && isChange){
+    const {product_id, product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_paid_price, product_discount, product_description, product_images, product_status, isChange} = req.body.fashionEdit;
+    console.log(req.body.fashionEdit);
+    if (product_images && isChange){
 
         var arr =[]
-        images.forEach(async(image) => {
+        product_images.forEach(async(image) => {
             try {
                 const uploadImage = await cloudinary.uploader.upload(image, {
                     upload_preset: 'ml_default'
@@ -116,34 +126,39 @@ exports.updateProduct = async(req, res) => {
         });
     }
 
-    PRODUCT.updateOne(
-        {'product_id': id},
-        [ { $set: 
-            { 
-                'product_images': arr,
-                'product_name': name,
-                'product_qty': qty,
-                'product_type_fk': type,
-                'product_size_fk': size,
-                'product_unit_price': unitPrice,
-                'product_paid_price': paidPrice,
-                'product_discount': discount,
-                'product_description': description,
-                'product_status': status
-            } 
-        } ] 
-        ).then(async(data) => {
-        if (!data) {
-            await res.status(404).send({
-                message: `Cannot update PRODUCT with id=${id}. Maybe PRODUCT was not found!`
-            });
-        } else res.send({ message: "PRODUCT was updated successfully." });
-    })
-    .catch(async(err) => {
-        await res.status(500).send({
-            message: "Error updating PRODUCT with id=" + id
-        });
-    });;
+    try {
+        await PRODUCT.updateOne(
+            {product_id: product_id},
+            [ { $set: 
+                { 
+                    product_images: arr,
+                    product_name: product_name,
+                    product_qty: product_qty,
+                    product_type_fk: product_type_fk,
+                    product_size_fk: product_size_fk,
+                    product_unit_price: product_unit_price,
+                    product_paid_price: product_paid_price || product_unit_price,
+                    product_discount: product_discount,
+                    product_description: product_description,
+                    product_status: product_status
+                } 
+            } ] );
+        const product = await PRODUCT.findOne({product_id: product_id});
+
+        if(product){
+            res.status(200).json({
+                message: "Update sản phẩm thành công!",
+                product: product
+            })
+        } else {
+            res.status(500).json({message: "Không tìm thấy sản phẩm!!!"});
+        }
+    } catch (error) {
+        res.status(500).json({
+            message: "Không thể update thông tin sản phẩm!",
+            error: error
+        })
+    }
 }
 
 exports.updateImage = async(req, res) => {

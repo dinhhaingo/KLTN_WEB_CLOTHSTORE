@@ -5,7 +5,8 @@ const cors = require("cors");
 const app = express();
 
 var corsOptions = {
-    origin: "http://localhost:8081"
+    origin: "http://192.168.0.104:4200",
+    optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
@@ -47,8 +48,8 @@ app.get("/", (req, res) => {
 
 // require("./app/routes/product_comment.route")(app);
 // require("./app/routes/product_rating.route")(app);
-// require("./app/routes/product_size.route")(app);
-// require("./app/routes/product_type.route")(app);
+require("./app/routes/product_size.route")(app);
+require("./app/routes/product_type.route")(app);
 // require("./app/routes/province.route")(app);
 // require("./app/routes/voucher.route")(app);
 // set port, listen for requests

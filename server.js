@@ -1,6 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const upload = require('multer');
 
 const app = express();
 
@@ -26,7 +27,9 @@ db.mongoose
     });
 
 // parse requests of content-type - application/json
-app.use(bodyParser.json());
+app.use(bodyParser.json({limit: '50mb', extended: true}));
+// app.use(upload);
+// app.use(express.static('public'));
 
 // parse requests of content-type - application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: true }));

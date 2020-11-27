@@ -3,7 +3,9 @@ const CUSTOMER = db.customer;
 const { cloudinary } = require('../config/cd.config');
 const jwtHelper = require('../helper/jwt.helper');
 const Auth = require('../middleware/AuthMiddleware');
+const paginateInfo = require('paginate-info');
 
+const constant = require('../constant/constant.js')
 const debug = console.log.bind(console);
 
 let tokenList = {};
@@ -127,7 +129,7 @@ exports.updateProfile = async (req, res) => {
     }
 
     const encode = require('nodejs-base64-encode');
-    var linkImage: String;
+    var linkImage = constant.avatar.default;
     if (avatar && isChange) {
         var image = encode.encode(avatar, 'base64');
     }
@@ -238,19 +240,34 @@ exports.forgotPassword = async (req, res) => {
 }
 
 // Retrieve all Tutorials from the database.
-exports.findAll = (req, res) => {
-    const user_id = req.query.user_id;
-    var condition = user_id ? { user_id: { $regex: new RegExp(user_id), $options: "i" } } : {};
+exports.findAll = async(req, res) => {
+    const { search, currentPage, sort } = req.query;
+    let orderBy = -1;
+    if(sort && sort === 'asc'){
+        orderBy = 1;
+    }
+    
+    const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
+    const customer = await CUSTOMER.aggregate([
+        { $match: search ? { $text: { $search: search } } : {} },
+        { $sort: { customer_id: orderBy } },
+    ]).then(async (data) => {
+        const count = data.length;
+        const pagData = data.slice(offset, offset + limit);
+        const pagInfo = paginateInfo.paginate(currentPage, count, pagData);
 
-    CUSTOMER.find(condition)
-        .then(data => {
-            res.send(data);
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: err.message || "Some error occurred while retrieving tutorials."
-            });
+        await res.status(200).json({
+            status: 'Success',
+            data: pagData,
+            meta: pagInfo,
+            countPage: Math.ceil(count/10)
         });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
 };
 
 exports.login = async(req, res) =>{

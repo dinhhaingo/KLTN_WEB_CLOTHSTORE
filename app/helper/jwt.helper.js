@@ -6,6 +6,7 @@ let generateToken = async(user, secretSign, tokenLife) =>{
             id: user.id,
             username: user.username,
             name: user.name,
+            role: user.role || null
         }
 
         await jwt.sign(

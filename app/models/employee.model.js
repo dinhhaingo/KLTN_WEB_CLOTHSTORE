@@ -11,7 +11,7 @@ module.exports = mongoose => {
         employee_role: String,
         employee_avatar: String,
         employee_gender: String,
-        employee_status: Number
+        employee_status: Boolean
     }, { timestamps: false });
 
     schema.method("toJSON", function() {

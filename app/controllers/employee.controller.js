@@ -4,6 +4,10 @@ const EMPLOYEE = dbase.employee;
 const mongoose = require("mongoose");
 const { cloudinary } = require('../config/cd.config');
 const jwtHelper = require('../helper/jwt.helper');
+const paginateInfo = require('paginate-info');
+
+const constant = require('../constant/constant.js');
+const md5 = require('md5');
 
 const debug = console.log.bind(console);
 
@@ -19,47 +23,47 @@ const accessTokenLife = process.env.ACCESS_TOKEN_LIFE || "1d";
 // Create and Save a new Tutorial
 exports.create = async (req, res) => {
     // Validate request
-    const {username, password, confirmPass, role, name, phone, address, province, district, avatar, gender, status} = req.body;
-    console.log(req.body);
-    if (!(username && password && confirmPass)) {
+    const {employee_userName, employee_password, employee_role, employee_fullName, employee_phone, employee_address, employee_province, employee_district, employee_avatar, employee_gender, employee_status} = req.body.user;
+    
+    if (!(employee_userName && employee_password)) {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
     }
-    const user = await EMPLOYEE.findOne({username});
+    const user = await EMPLOYEE.findOne({employee_userName});
     if(user){
         return res.status(400).json({msg: "Username đã tồn tại!!!"});
     }
 
     const encode = require('nodejs-base64-encode');
-    const md5 = require('md5');
-    linkImage = '';
-    if (avatar) {
-        var image = encode.encode(avatar, 'base64');
-    }
-    try {
-        const uploadImage = await cloudinary.uploader.upload(image, {
-            upload_preset: 'ml_default'
-        });
-        linkImage = uploadImage.url;
-        console.log(uploadImage);
-    } catch (error) {
-        console.log(error);
+    
+    linkImage = constant.avatar.default;
+    if (employee_avatar) {
+        var image = encode.encode(employee_avatar, 'base64');
+
+        try {
+            const uploadImage = await cloudinary.uploader.uploads(image, {
+                upload_preset: 'ml_default'
+            });
+            linkImage = uploadImage.url;
+        } catch (error) {
+            console.log(error);
+        }
     }
 
     // Create a Tutorial
     const employee = new EMPLOYEE({
         employee_id: await dbase.autoIncrement('employee'),
-        employee_fullName: name,
-        employee_phone: phone,
-        employee_password: md5(password),
-        employee_userName: username,
-        employee_address: address,
-        employee_province: province,
-        employee_district: district,
-        employee_role: role,
+        employee_fullName: employee_fullName,
+        employee_phone: employee_phone,
+        employee_password: md5(employee_password),
+        employee_userName: employee_userName,
+        employee_address: employee_address,
+        employee_province: employee_province,
+        employee_district: employee_district,
+        employee_role: parseInt(employee_role),
         employee_avatar: linkImage,
-        employee_gender: gender,
-        employee_status: status,
+        employee_gender: employee_gender,
+        employee_status: true,
     });
     // Save Tutorial in the database
     employee
@@ -91,15 +95,48 @@ exports.findAll = (req, res) => {
 };
 
 exports.getAll = async (req, res) => {
-    const condition = req.param.search;
-    await EMPLOYEE.agregate([
-        { $match: { $text: { $search: condition } } },
-        { $sort: { $score: { $meta: 'textScore' } } },
-        { group: { '_id': null, views: { $sum: '$views' } } },
-        { $skip: 0 },
-        { $limit: 10 }
+    const { search, currentPage, sort } = req.query;
+
+    let orderBy = -1;
+    if(sort && sort === 'asc'){
+        orderBy = 1;
+    }
+    
+    const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
+    const employee = await EMPLOYEE.aggregate([
+        { $match: search ? { $text: { $search: search } } : {} },
+        { $sort: { employee_id: orderBy } },
+        {
+            $lookup:
+            {
+                from: 'employee_roles',
+                localField: 'employee_role',
+                foreignField: 'employee_role_id',
+                as: 'role'
+            }
+        },
     ]).then(async (data) => {
-        await res.send(data);
+        const count = data.length;
+        const pagData = data.slice(offset, offset + limit);
+
+        pagData.forEach(async (data) => {
+            if(data['employee_role'] === 1){
+                data['employee_role'] = 'Admin';
+            } else if(data['employee_role'] === 2) {
+                data['employee_role'] = 'Warehouse';
+            } else {
+                data['employee_role'] = 'Sale';
+            }
+        });
+        
+        const pagInfo = paginateInfo.paginate(currentPage, count, pagData);
+
+        await res.status(200).json({
+            status: 'Success',
+            data: pagData,
+            meta: pagInfo,
+            countPage: Math.ceil(count/10)
+        });
     }
     ).catch(async (err) => {
         await res.status(500).send({
@@ -143,55 +180,56 @@ exports.changePassword = async(req, res) => {
 }
 
 exports.updateProfile = async(req, res) => {
-
-    const {id, role, name, phone, address, province, district, avatar, gender, status, isChange} = req.body;
-
+    const {employee_id, employee_password,employee_role, employee_fullName, employee_phone, employee_address, employee_province, employee_district, employee_avatar, employee_gender, employee_status, isChange} = req.body.user;
+    
     if (!req.body) {
         return res.status(400).send({
             message: "Data to update can not be empty!"
         });
     }
-
-    const encode = require('nodejs-base64-encode');
-    linkImage = '';
-    if (avatar && isChange) {
-        var image = encode.encode(avatar, 'base64');
+    const employee = await EMPLOYEE.findOne({employee_id: employee_id})
+    let password = '';
+    if(!employee){
+        return res.status(400).json({message: "Không tìm thấy employee"});
+    } else {
+        password = employee['employee_password'];
     }
-    try {
-        const uploadImage = await cloudinary.uploader.upload(image, {
-            upload_preset: 'ml_default'
-        });
-        linkImage = uploadImage.url;
-        console.log(uploadImage);
-    } catch (error) {
-        console.log(error);
-    }
+    linkImage = constant.avatar.default;
+    if (employee_avatar && isChange) {
+        try {
+            const uploadImage = await cloudinary.uploads(employee_avatar);
+            linkImage = uploadImage.url;
+        } catch (error) {
+            console.log(error);
+        }
+    }    
 
-    EMPLOYEE.updateOne(
-        { 'employee_id': id }, 
+    await EMPLOYEE.updateOne(
+        { employee_id: employee_id }, 
         [ { $set: 
             { 
-            'employee_avatar': linkImage,
-            'employee_fullName': name, 
-            'employee_phone': phone, 
-            'employee_address': address,
-            'employee_province': province,
-            'employee_district': district,
-            'employee_role': role,
-            'employee_gender': gender,
-            'employee_status': status 
+            employee_avatar: linkImage,
+            employee_fullName: employee_fullName,
+            employee_password: employee_password ? md5(employee_password) : password, 
+            employee_phone: employee_phone, 
+            employee_address: employee_address,
+            employee_province: employee_province,
+            employee_district: employee_district,
+            employee_role: parseInt(employee_role),
+            employee_gender: employee_gender,
+            employee_status: employee_status 
             } 
         } ]
         ).then(async (data) => {
             if (!data) {
                 await res.status(404).send({
-                    message: `Cannot update PRODUCT with id=${id}. Maybe PRODUCT was not found!`
+                    message: `Cannot update PRODUCT with id=${employee_id}. Maybe PRODUCT was not found!`
                 });
             } else res.send({ message: "PRODUCT was updated successfully." });
         })
         .catch(async (err) => {
             await res.status(500).send({
-                message: "Error updating PRODUCT with id=" + id
+                message: "Error updating PRODUCT with id=" + employee_id
             });
         });;
 }
@@ -214,7 +252,6 @@ exports.updateImage = async(req, res) => {
             upload_preset: 'ml_default'
         });
         linkImage = uploadImage.url;
-        console.log(uploadImage);
     } catch (error) {
         console.log(error);
     }
@@ -257,8 +294,6 @@ exports.login = async(req, res) =>{
             message: "Phải nhập đầy đủ thông tin đăng nhập!"
         }); 
     }
-    // const user1 = await EMPLOYEE.findOne({employee_userName: username});
-    // console.log(user1);
     await EMPLOYEE.findOne({
         employee_userName: username 
     }, async(err, user) => {
@@ -273,7 +308,9 @@ exports.login = async(req, res) =>{
                     const userData = {
                         id: user.employee_id,
                         username: username,
-                        name: user.employee_fullName
+                        name: user.employee_fullName,
+                        role: user.employee_role,
+                        avatar: user.employee_avatar
                     }
                     const accessToken = await jwtHelper.generateToken(userData, accessTokenSecret, accessTokenLife);
                     const refreshToken = await jwtHelper.generateToken(userData, refreshTokenSecret, refreshTokenLife);

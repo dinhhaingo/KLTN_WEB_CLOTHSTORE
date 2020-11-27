@@ -5,8 +5,10 @@ module.exports = mongoose => {
         customer_fk: Number,
         order_customer_address: String,
         order_customer_phone: String,
+        order_customer_name: String,
         order_status_fk: Number,
-        order_voucher_fk: Number
+        order_payment_success_at: Date,
+        order_payment_fail_at: Date
       },
       { timestamps: true }
     );

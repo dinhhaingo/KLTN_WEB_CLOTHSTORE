@@ -1,7 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const upload = require('multer');
+const multer = require('multer');
 
 const app = express();
 
@@ -41,13 +41,14 @@ app.get("/", (req, res) => {
 
 // require("./app/routes/posts.route")(app);
 // require("./app/routes/customer_voucher.route")(app);
-// require("./app/routes/customer.route")(app);
+require("./app/routes/customer.route")(app);
 // require("./app/routes/district.route")(app);
 // require("./app/routes/order_detail.route")(app);
 // require("./app/routes/order_status.route")(app);
-// require("./app/routes/order.route")(app);
- require("./app/routes/product.route")(app);
- require("./app/routes/employee.route")(app);
+require("./app/routes/order.route")(app);
+require("./app/routes/product.route")(app);
+require("./app/routes/employee.route")(app);
+require("./app/routes/employee_role.route")(app);
 
 // require("./app/routes/product_comment.route")(app);
 // require("./app/routes/product_rating.route")(app);

@@ -1,6 +1,6 @@
 var express = require('express')
 const cors = require("cors");
-
+const bodyParser = require('body-parser');
 const app = express();
 
 var corsOptions = {
@@ -19,7 +19,7 @@ module.exports = app => {
 
     router.get("/find-all", employee.findAll);
 
-    router.get("/get-all", employee.findAll);
+    router.get("/get-all", employee.getAll);
 
     router.put("/change-password", employee.changePassword);
 
@@ -29,7 +29,7 @@ module.exports = app => {
 
     router.post("/login", cors(corsOptions), employee.login);
 
-    router.put("/refresh-token", employee.refreshToken);
+    router.post("/refresh-token", employee.refreshToken);
 
     app.use('/employee', router);
 };

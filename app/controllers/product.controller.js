@@ -2,7 +2,7 @@ const { query } = require("express");
 const dbase = require("../models/index");
 const PRODUCT = dbase.product;
 const mongoose = require("mongoose");
-const { cloudinary } = require('../config/cd.config');
+const cloudinary = require('../config/cd.config');
 const encode = require('nodejs-base64-encode');
 const paginateInfo = require('paginate-info')
 
@@ -11,13 +11,15 @@ let base64 = require('base-64');
 dbase.mongoose = mongoose;
 
 exports.create = async (req, res) => {
-    const { product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_discount, product_description, product_images, product_status } = req.body.fashionCreate;
+    const { product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_discount, product_description, product_images } = req.body.fashionCreate;
     const pro = await PRODUCT.findOne({ product_name });
+
+    // console.log(req);
 
     let message = '';
     let arrImage = [];
     let paid_price = product_unit_price;
-console.log('hinh anh: ', product_images);
+
     if (!product_name) {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
@@ -26,20 +28,19 @@ console.log('hinh anh: ', product_images);
     if (pro) {
         return res.status(400).json({ msg: "Sản phẩm đã tồn tại!" })
     }
-    console.log(req.body.fashionCreate);
-    if (product_images) {
-        console.log(product_images);
-        product_images.forEach(async (image) => {
-            try {
-                image = await base64.encode(image);
-                const uploadImage = await cloudinary.uploads(image);
-                arrImage.push(uploadImage.url);
-                console.log(uploadImage);
-            } catch (error) {
-                message = "Không thể upload hình ảnh!";
-            }
-        });
-    }
+    const uploadImage = await cloudinary.uploads(product_images[0]);
+    arrImage.push(uploadImage.url);
+    // if (product_images) {
+    //     product_images.forEach(async (image) => {
+    //         try {
+    //             const uploadImage = await cloudinary.uploads(image);
+    //             // arrImage.push(uploadImage.url);
+    //             console.log(uploadImage.url);
+    //         } catch (error) {
+    //             message = "Không thể upload hình ảnh!";
+    //         }
+    //     });
+    // }
 
     if (product_discount) {
         paid_price = (100 - product_discount) * product_unit_price / 100;
@@ -56,7 +57,7 @@ console.log('hinh anh: ', product_images);
         product_discount: product_discount,
         product_description: product_description,
         product_images: arrImage,
-        product_status: product_status
+        product_status: true
     });
 
     product
@@ -91,13 +92,18 @@ exports.findAll = (req, res) => {
 };
 
 exports.getAll = async (req, res) => {
-    const condition = req.query.search;
-    const currentPage = req.query.currentPage;
 
+    const { search, currentPage, sort, type } = req.query;
+
+    let orderBy = -1;
+    if(sort && sort === 'asc'){
+        orderBy = 1;
+    }
+    
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
-
     const product = await PRODUCT.aggregate([
-        { $match: condition ? { $text: { $search: condition } } : {} },
+        { $match: { $and: [ search ? { $text: { $search: search } } : {}, type ? { product_type_fk: parseInt(type) }  : {} ] } },
+        { $sort: { product_id: orderBy } },
         // { $sort: { score: { $meta: "textScore" } } },
         // { $group: { _id: null, views: { $sum: "$views" } } },
         {
@@ -120,6 +126,10 @@ exports.getAll = async (req, res) => {
         }
         
     ]).then(async (data) => {
+        data.forEach(product => {
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        });
         const count = data.length;
         const pagData = data.slice(offset, offset + limit);
         const pagInfo = paginateInfo.paginate(currentPage, count, pagData);
@@ -127,7 +137,8 @@ exports.getAll = async (req, res) => {
         await res.status(200).json({
             status: 'Success',
             data: pagData,
-            meta: pagInfo
+            meta: pagInfo,
+            countPage: Math.ceil(count/10)
         });
     }
     ).catch(async (err) => {

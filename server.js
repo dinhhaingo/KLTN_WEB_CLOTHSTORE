@@ -6,7 +6,7 @@ const multer = require('multer');
 const app = express();
 
 var corsOptions = {
-    origin: "https://kltn-fe-admin.vercel.app/",
+    origin: "https://kltn-fe-admin.vercel.app",
     optionsSuccessStatus: 200
 };
 

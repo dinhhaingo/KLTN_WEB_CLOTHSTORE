@@ -5,7 +5,7 @@ const app = express();
 const authMiddleware = require('../middleware/AuthMiddleware');
 
 var corsOptions = {
-    origin: "https://kltn-fe-admin.vercel.app/",
+    origin: "https://kltn-fe-admin.vercel.app",
     optionsSuccessStatus: 200
 };
 

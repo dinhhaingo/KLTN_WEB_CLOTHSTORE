@@ -54,31 +54,31 @@ exports.create = (req, res) => {
 };
 
 exports.register = async (req, res) => {
-    const { fullName, phone, password, confirmPass } = req.body;
+    const { fullName, phoneNumber, passWord, rePass } = req.body.user;
 
-    if (!(phone && fullName && password)) {
+    if (!(phoneNumber && fullName && passWord)) {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
     }
-
-    const cus = await CUSTOMER.findOne({ customer_phone: phone })
+    let linkImage = constant.avatar.default;
+    const cus = await CUSTOMER.findOne({ customer_phone: phoneNumber })
     if (cus) {
         return res.status(400).json({ message: "Số điện thoại đã tồn tại!" });
     }
 
-    if (password !== confirmPass) {
+    if (passWord !== rePass) {
         res.status(400).send({ message: "Mật khẩu không trùng khớp!" });
         return;
     }
     // Create a Tutorial
     const customer = new CUSTOMER({
         customer_fullName: fullName,
-        customer_avatar: null,
+        customer_avatar: linkImage,
         customer_gender: null,
-        customer_verify: 0,
+        customer_verify: 1,
         customer_birthday: null,
-        customer_phone: phone,
-        customer_pass: md5(password),
+        customer_phone: phoneNumber,
+        customer_pass: md5(passWord),
         customer_province: null,
         customer_district: null,
         customer_address: null
@@ -271,28 +271,28 @@ exports.findAll = async(req, res) => {
 };
 
 exports.login = async(req, res) =>{
-    const {phone, password} = req.body;
+    const {username, password} = req.body;
     const md5 = require('md5');
-    if (!(phone && password)){
+    if (!(username && password)){
         return res.status(400).send({
             message: "Phải nhập đầy đủ thông tin đăng nhập!"
         }); 
     }
 
     await CUSTOMER.findOne({
-        customer_phone: phone 
+        customer_phone: username 
     }, async(err, user) => {
         if(err) throw err;
         if(!user){
             res.status(401).json({ message: 'Không tìm thấy username!!!' });
         } else if(user) {
-            if(md5(password) !== user.password){
+            if(md5(password) !== user.customer_pass){
                 res.status(401).json({ message: "Mật khẩu không đúng!!!" });
             } else {
                 try {
                     const userData = {
                         id: user.customer_id,
-                        username: phone,
+                        username: username,
                         name: user.customer_fullName
                     }
                     const accessToken = await jwtHelper.generateToken(userData, accessTokenSecret, accessTokenLife);
@@ -300,7 +300,10 @@ exports.login = async(req, res) =>{
     
                     tokenList[refreshToken] = {userData, refreshToken, accessToken};
                     
-                    return res.status(200).json(tokenList[refreshToken]);
+                    return res.status(200).json({
+                        token: tokenList[refreshToken],
+                        user: user
+                    });
                 } catch (error) {
                     return res.status(500).json(error);
                 }

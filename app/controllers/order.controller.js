@@ -199,16 +199,13 @@ exports.getAll = async (req, res) => {
 
 exports.getByCustomer = async(req, res) =>{
     const customer = req.jwtDecoded;
-    const {currentPage, sort } = req.query;
+    const {currentPage, status } = req.query;
 
     let orderBy = -1;
-    if(sort && sort === 'asc'){
-        orderBy = 1;
-    }
     
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const order = await ORDER.aggregate([
-        { $match: customer.id },
+        { $match: { $and: [ { customer_fk: customer.id}, { order_fk_status: status || 1} ] } },
         { $sort: { order_id: orderBy } },
         {
             $lookup:
@@ -228,7 +225,8 @@ exports.getByCustomer = async(req, res) =>{
         await res.status(200).json({
             status: 'Success',
             data: pagData,
-            meta: pagInfo
+            meta: pagInfo,
+            countPage: Math.ceil(count/10)
         });
     }
     ).catch(async (err) => {

@@ -1,6 +1,7 @@
 const { query } = require("express");
 const dbase = require("../models/index");
 const PRODUCT = dbase.product;
+const ORDERDETAIL = dbase.orderDetail
 const mongoose = require("mongoose");
 const cloudinary = require('../config/cd.config');
 const encode = require('nodejs-base64-encode');
@@ -14,8 +15,6 @@ exports.create = async (req, res) => {
     const { product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_discount, product_description, product_images } = req.body.fashionCreate;
     const pro = await PRODUCT.findOne({ product_name });
 
-    // console.log(req);
-
     let message = '';
     let arrImage = [];
     let paid_price = product_unit_price;
@@ -28,19 +27,18 @@ exports.create = async (req, res) => {
     if (pro) {
         return res.status(400).json({ msg: "Sản phẩm đã tồn tại!" })
     }
-    const uploadImage = await cloudinary.uploads(product_images[0]);
-    arrImage.push(uploadImage.url);
-    // if (product_images) {
-    //     product_images.forEach(async (image) => {
-    //         try {
-    //             const uploadImage = await cloudinary.uploads(image);
-    //             // arrImage.push(uploadImage.url);
-    //             console.log(uploadImage.url);
-    //         } catch (error) {
-    //             message = "Không thể upload hình ảnh!";
-    //         }
-    //     });
-    // }
+    // const uploadImage = await cloudinary.uploads(product_images[0]);
+    // arrImage.push(uploadImage.url);
+    if (product_images) {
+        product_images.forEach(async (image) => {
+            try {
+                let uploadImage = await cloudinary.uploads(image);
+                arrImage.push(uploadImage.url);
+            } catch (error) {
+                message = "Không thể upload hình ảnh!";
+            }
+        });
+    }
 
     if (product_discount) {
         paid_price = (100 - product_discount) * product_unit_price / 100;
@@ -75,37 +73,19 @@ exports.create = async (req, res) => {
         });
 };
 
-// Retrieve all Tutorials from the database.
-exports.findAll = (req, res) => {
-    const id = req.query.product_id;
-    let condition = id ? { product_id: { $regex: new RegExp(id), $options: "i" } } : {};
-
-    PRODUCT.find(condition)
-        .then(data => {
-            res.send(data);
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: err.message || "Some error occurred while retrieving tutorials."
-            });
-        });
-};
-
 exports.getAll = async (req, res) => {
 
     const { search, currentPage, sort, type } = req.query;
 
     let orderBy = -1;
-    if(sort && sort === 'asc'){
+    if (sort && sort === 'asc') {
         orderBy = 1;
     }
-    
+
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const product = await PRODUCT.aggregate([
-        { $match: { $and: [ search ? { $text: { $search: search } } : {}, type ? { product_type_fk: parseInt(type) }  : {} ] } },
+        { $match: { $and: [search ? { $text: { $search: search } } : {}, type ? { product_type_fk: parseInt(type) } : {}] } },
         { $sort: { product_id: orderBy } },
-        // { $sort: { score: { $meta: "textScore" } } },
-        // { $group: { _id: null, views: { $sum: "$views" } } },
         {
             $lookup:
             {
@@ -124,7 +104,7 @@ exports.getAll = async (req, res) => {
                 as: 'product_size'
             }
         }
-        
+
     ]).then(async (data) => {
         data.forEach(product => {
             const date = product['createdAt'];
@@ -138,7 +118,7 @@ exports.getAll = async (req, res) => {
             status: 'Success',
             data: pagData,
             meta: pagInfo,
-            countPage: Math.ceil(count/10)
+            countPage: Math.ceil(count / 10)
         });
     }
     ).catch(async (err) => {
@@ -230,11 +210,11 @@ exports.updateImage = async (req, res) => {
             message: "Data to update can not be empty!"
         });
     }
+    let arr = []
 
     if (request.product_images) {
         const arrImage = request.product_images;
 
-        let arr = []
         arrImage.forEach(async (image) => {
             try {
                 const uploadImage = await cloudinary.uploader.upload(image, {
@@ -249,7 +229,7 @@ exports.updateImage = async (req, res) => {
 
     const id = request.product_id;
 
-    PRODUCT.updateOne({ 'product_id': id }, [{ $set: { 'product_images': arr } }])
+    PRODUCT.updateOne({ 'product_id': id }, [{ $set: { 'product_images': arr || null } }])
         .then(async (data) => {
             if (!data) {
                 await res.status(404).send({
@@ -264,53 +244,336 @@ exports.updateImage = async (req, res) => {
         });;
 };
 
-// Delete a Tutorial with the specified id in the request
-exports.delete = (req, res) => {
-    const id = req.params.product_id;
+exports.getProductDiscount = async (req, res) => {
 
-    PRODUCT.findbyIdAndRemove(id)
-        .then(data => {
-            if (!data) {
-                res.status(404).send({
-                    message: `Cannot delete PRODUCT with id=${id}. Maybe PRODUCT was not found!`
-                });
-            } else {
-                res.send({
-                    message: "PRODUCT was deleted successfully!"
-                });
+    const { search, currentPage, sort, type } = req.query;
+
+    let orderBy = -1;
+    if (sort && sort === 'asc') {
+        orderBy = 1;
+    }
+
+    let prod = [];
+
+    const product = await PRODUCT.aggregate([
+        { $match: { $and: [search ? { $text: { $search: search } } : {}, type ? { product_type_fk: parseInt(type) } : {}] } },
+        { $sort: { product_id: orderBy } },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
             }
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: "Could not delete PRODUCT with id=" + id
-            });
+        },
+        { $unwind: '$product_type' },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: '$product_size' }
+    ]).then(async (data) => {
+        data.forEach(product => {
+            if (product['product_unit_price'] > product['product_paid_price'] && product['product_status'] === true) {
+                const date = product['createdAt'];
+                product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+                prod.push(product);
+            }
         });
+
+        await res.status(200).json({
+            status: 'Success',
+            data: prod
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+
 };
 
-// Delete all Tutorials from the database.
-exports.deleteAll = (req, res) => {
-    PRODUCT.deleteMany({})
-        .then(data => {
-            res.send({
-                message: `${data.deletedCount} PRODUCT were deleted successfully!`
-            });
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: err.message || "Some error occurred while removing all products."
-            });
+exports.getProductRandom = async (req, res) => {
+    let prod = [];
+    const product = await PRODUCT.aggregate([
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: '$product_type' },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: '$product_size' }
+
+    ]).then(async (data) => {
+
+        for (let i = 0; i < 3; i++) {
+            prod.push(data[Math.floor(Math.random() * data.length)])
+        }
+
+        prod.forEach(product => {
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
         });
+
+        await res.status(200).json({
+            status: 'Success',
+            data: prod
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
 };
 
-// Find all published Tutorials
-exports.findAllPublished = (req, res) => {
-    PRODUCT.find({ published: true })
-        .then(data => {
-            res.send(data);
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: err.message || "Some error occurred while retrieving products."
-            });
+exports.getAllClient = async (req, res) => {
+
+    const { currentPage, sort, type, value } = req.query;
+    let val;
+    if (value) {
+        val = JSON.parse(value)
+    };
+    let orderBy = -1;
+    if (sort && sort === 'asc') {
+        orderBy = 1;
+    }
+
+    let prod = [];
+    let min = 0;
+    let max = 0;
+    const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 9);
+    const product = await PRODUCT.aggregate([
+        { $match: type ? { product_type_fk: parseInt(type) } : {} },
+        { $sort: { product_paid_price: orderBy } },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: "$product_type" },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: "$product_size" }
+    ]).then(async (data) => {
+        min = max = data[0]['product_paid_price'];
+        data.forEach(product => {
+            if (min > product['product_paid_price']) min = product['product_paid_price'];
+            if (max < product['product_paid_price']) max = product['product_paid_price'];
+
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
         });
+        if (value) {
+            data.forEach(product => {
+                if (product['product_paid_price'] >= val.minValue && product['product_paid_price'] <= val.maxValue) {
+                    prod.push(product)
+                }
+            });
+        } else prod = data;
+
+        const count = prod.length;
+        const pagData = prod.slice(offset, offset + limit);
+        const pagInfo = paginateInfo.paginate(currentPage, count, pagData);
+
+        await res.status(200).json({
+            status: 'Success',
+            data: pagData,
+            meta: pagInfo,
+            countPage: Math.ceil(count / 9),
+            minPrice: min,
+            maxPrice: max
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+};
+
+exports.getProductHot = async (req, res) => {
+    let prod = [];
+    const orderDetail = await ORDERDETAIL.aggregate([
+        {
+            $group: {
+                _id: "$product_fk",
+                total: { $sum: "$order_detail_qty" },
+                count: { $sum: 1 }
+            }
+        },
+        { $sort: { "count": -1 } }
+    ]);
+
+    const product = await PRODUCT.aggregate([
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: '$product_type' },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: '$product_size' }
+
+    ]).then(async (data) => {
+        prod.forEach(product => {
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+
+            orderDetail.forEach(order => {
+                if (product['product_id'] == order['_id']) {
+                    prod.push(product);
+                    prod['total'] = order['total'];
+                    prod['count'] = order['count'];
+                }
+            });
+
+        });
+
+        await res.status(200).json({
+            status: 'Success',
+            data: prod
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+};
+
+exports.searchProduct = async (req, res) => {
+    const search = req.query.search;
+
+    const product = await PRODUCT.aggregate([
+        { $match: search ? { $text: { $search: search } } : {} },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: "$product_type" },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: "$product_size" }
+    ]).then(async (data) => {
+        data.forEach(product => {
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        });
+
+        await res.status(200).json({
+            status: 'Success',
+            data: data
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+};
+
+// Find a single Tutorial with an id
+exports.getById = async (req, res) => {
+    const name = req.query.name;
+
+    if (!name) {
+        return res.status(500).json({ message: "Sản phẩm không xác định!" })
+    }
+
+    await PRODUCT.aggregate([
+        { $match: name ? { product_name: name } : {} },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: '$product_type' },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: '$product_size' }
+    ]).then(data => {
+        if (!data) {
+            res.status(404).send({ message: "Không tìm thấy sản phẩm " });
+        }
+        else {
+            data.forEach(product => {
+                const date = product['createdAt'];
+                product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            });
+
+            res.status(200).json({
+                status: 'Success',
+                data: data
+            });
+        }
+    }).catch(err => {
+        res.status(500).json({ message: "Error retrieving Tutorial with id=" + id });
+    });
 };

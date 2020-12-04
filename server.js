@@ -5,12 +5,16 @@ const multer = require('multer');
 
 const app = express();
 
-var corsOptions = {
-    origin: "https://kltn-fe-admin.vercel.app",
+// var corsOptions = {
+//     origin: "https://kltn-fe-admin.vercel.app",
+//     optionsSuccessStatus: 200
+// };
+var corsOptions1 = {
+    origin: "http://192.168.0.105:4200",
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions));
+app.use(cors(corsOptions1));
 
 const db = require("./app/models/index/index");
 db.mongoose
@@ -54,7 +58,7 @@ require("./app/routes/employee_role.route")(app);
 // require("./app/routes/product_rating.route")(app);
 require("./app/routes/product_size.route")(app);
 require("./app/routes/product_type.route")(app);
-// require("./app/routes/province.route")(app);
+require("./app/routes/province.route")(app);
 // require("./app/routes/voucher.route")(app);
 // set port, listen for requests
 

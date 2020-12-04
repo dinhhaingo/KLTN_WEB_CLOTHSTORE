@@ -4,12 +4,12 @@ const bodyParser = require('body-parser');
 const app = express();
 const authMiddleware = require('../middleware/AuthMiddleware');
 
-var corsOptions = {
-    origin: "https://kltn-fe-admin.vercel.app",
+var corsOptions1 = {
+    origin: "http://192.168.0.105:4200",
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions));
+app.use(cors(corsOptions1));
 
 module.exports = app => {
     const order = require("../controllers/order.controller.js");

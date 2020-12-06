@@ -3,7 +3,7 @@ const dbase = require("../models/index");
 const PRODUCT = dbase.product;
 const ORDERDETAIL = dbase.orderDetail
 const mongoose = require("mongoose");
-const cloudinary = require('../config/cd.config');
+const cloudinary = require('../config/cd.config'); 
 const encode = require('nodejs-base64-encode');
 const paginateInfo = require('paginate-info')
 
@@ -13,7 +13,6 @@ dbase.mongoose = mongoose;
 
 exports.create = async (req, res) => {
     const { product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_discount, product_description, product_images } = req.body.fashionCreate;
-    const pro = await PRODUCT.findOne({ product_name });
 
     let message = '';
     let arrImage = [];
@@ -23,28 +22,25 @@ exports.create = async (req, res) => {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
     }
-
-    if (pro) {
-        return res.status(400).json({ msg: "Sản phẩm đã tồn tại!" })
-    }
     // const uploadImage = await cloudinary.uploads(product_images[0]);
     // arrImage.push(uploadImage.url);
     if (product_images) {
         product_images.forEach(async (image) => {
-            try {
-                let uploadImage = await cloudinary.uploads(image);
-                arrImage.push(uploadImage.url);
-            } catch (error) {
-                message = "Không thể upload hình ảnh!";
-            }
+            // try {
+            const uploadImage = await cloudinary.uploads(image);
+            console.log(uploadImage.url);
+            arrImage.push(uploadImage.url);
+            // } catch (error) {
+            //     message = "Không thể upload hình ảnh!";
+            // }
         });
     }
+    console.log(arrImage);
 
     if (product_discount) {
         paid_price = (100 - product_discount) * product_unit_price / 100;
     }
-
-    const product = new PRODUCT({
+    const product = await new PRODUCT({
         product_id: await dbase.autoIncrement('product'),
         product_name: product_name,
         product_qty: product_qty,
@@ -58,7 +54,7 @@ exports.create = async (req, res) => {
         product_status: true
     });
 
-    product
+    await product
         .save(product)
         .then(async (data) => {
             await res.json({
@@ -364,7 +360,7 @@ exports.getAllClient = async (req, res) => {
     let max = 0;
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 9);
     const product = await PRODUCT.aggregate([
-        { $match: type ? { product_type_fk: parseInt(type) } : {} },
+        { $match: { $and: [type ? { product_type_fk: parseInt(type) } : {}, { product_status: true } ] } },
         { $sort: { product_paid_price: orderBy } },
         {
             $lookup:
@@ -426,6 +422,7 @@ exports.getAllClient = async (req, res) => {
 exports.getProductHot = async (req, res) => {
     let prod = [];
     const orderDetail = await ORDERDETAIL.aggregate([
+        { $match: { product_status: true } },
         {
             $group: {
                 _id: "$product_fk",
@@ -489,7 +486,7 @@ exports.searchProduct = async (req, res) => {
     const search = req.query.search;
 
     const product = await PRODUCT.aggregate([
-        { $match: search ? { $text: { $search: search } } : {} },
+        { $match: { $and: [ search ? { $text: { $search: search } } : {}, { product_status: true } ] } },
         {
             $lookup:
             {
@@ -537,7 +534,7 @@ exports.getById = async (req, res) => {
     }
 
     await PRODUCT.aggregate([
-        { $match: name ? { product_name: name } : {} },
+        { $match: { $and: [ name ? { product_name: name } : {}, { product_status: true } ] } },
         {
             $lookup:
             {

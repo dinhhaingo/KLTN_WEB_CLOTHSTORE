@@ -10,7 +10,8 @@ module.exports = mongoose => {
         customer_phone: String,
         customer_pass: String,
         customer_province: Number,
-        custimer_district: Number,
+        customer_district: Number,
+        customer_ward: Number,
         customer_address: String
     }, { timestamps: true });
 

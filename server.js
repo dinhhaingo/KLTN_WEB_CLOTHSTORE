@@ -10,7 +10,7 @@ const app = express();
 //     optionsSuccessStatus: 200
 // };
 var corsOptions1 = {
-    origin: "http://192.168.0.105:4200",
+    origin: "http://192.168.0.100:4200",
     optionsSuccessStatus: 200
 };
 
@@ -59,6 +59,7 @@ require("./app/routes/employee_role.route")(app);
 require("./app/routes/product_size.route")(app);
 require("./app/routes/product_type.route")(app);
 require("./app/routes/province.route")(app);
+require("./app/routes/cart.route")(app);
 // require("./app/routes/voucher.route")(app);
 // set port, listen for requests
 

@@ -26,7 +26,7 @@ exports.insertSaleOrder = async (req, res) => {
 
     const order = new ORDER({
         order_id: await dbase.autoIncrement('order'),
-        customer_fk: user.id,
+        customer_fk: user.data.id,
         order_customer_name: data[0]['customer_name'],
         order_customer_phone: data[0]['customer_phone'],
         order_customer_address: data[0]['customer_address'],

@@ -1,9 +1,11 @@
 const db = require("../models/index/index");
 const CUSTOMER = db.customer;
+const CART = db.cart;
 const { cloudinary } = require('../config/cd.config');
 const jwtHelper = require('../helper/jwt.helper');
 const Auth = require('../middleware/AuthMiddleware');
 const paginateInfo = require('paginate-info');
+const tree = require("../libs/tree.json");
 
 const constant = require('../constant/constant.js')
 const debug = console.log.bind(console);
@@ -72,6 +74,7 @@ exports.register = async (req, res) => {
     }
     // Create a Tutorial
     const customer = new CUSTOMER({
+        customer_id: await dbase.autoIncrement('customer'),
         customer_fullName: fullName,
         customer_avatar: linkImage,
         customer_gender: null,
@@ -79,9 +82,10 @@ exports.register = async (req, res) => {
         customer_birthday: null,
         customer_phone: phoneNumber,
         customer_pass: md5(passWord),
-        customer_province: null,
-        customer_district: null,
-        customer_address: null
+        customer_province: '',
+        customer_district: '',
+        customer_ward: '',
+        customer_address: ''
     });
 
     // Save Tutorial in the database
@@ -122,42 +126,37 @@ exports.verifyCustomer = async (req, res) => {
 }
 
 exports.updateProfile = async (req, res) => {
-    const { id, name, avatar, gender, birthday, phone, province, district, address, isChange } = req.body;
+    const user = req.jwtDecoded;
+    const { customer_fullName, customer_avatar, customer_gender, customer_birthday, customer_province, customer_district, customer_ward, customer_address, isChange } = req.body.data;
 
     if (!req.body) {
         return res.status(400).send({ message: "Dữ liệu không được rỗng!" });
     }
 
     const encode = require('nodejs-base64-encode');
-    var linkImage = constant.avatar.default;
-    if (avatar && isChange) {
-        var image = encode.encode(avatar, 'base64');
-    }
-
-    try {
-        const uploadImage = await cloudinary.uploader.upload(image, {
-            upload_preset: 'ml_default'
-        });
+    let linkImage = ''
+    if (customer_avatar && isChange) {
+        const uploadImage = await cloudinary.uploads(customer_avatar);
         linkImage = uploadImage.url;
-    } catch (error) {
-        return res.status(400).json({
-            message: "Không thể update avatar",
-            error: error
-        })
+    }
+    const customerInfo = await CUSTOMER.findOne({ customer_id: user.data.id });
+
+    if (!customerInfo) {
+        return res.status(500).json({ message: "Không tìm thấy thông tin người dùng" });
     }
 
-    CUSTOMER.updateOne(
-        { customer_id: id },
+    await CUSTOMER.updateOne(
+        { customer_id: user.data.id },
         [{
             $set: {
-                customer_fullName: name,
-                customer_avatar: linkImage,
-                customer_gender: gender,
-                customer_birthday: birthday,
-                customer_phone: phone,
-                customer_province: province,
-                customer_district: district,
-                customer_address: address
+                customer_fullName: customer_fullName || customerInfo['customer_fullName'],
+                customer_avatar: linkImage || customerInfo['customer_avatar'],
+                customer_gender: customer_gender || customerInfo['customer_gender'],
+                customer_birthday: customer_birthday || customerInfo['customer_birthday'],
+                customer_province: customer_province || customerInfo['customer_province'],
+                customer_district: customer_district || customerInfo['customer_district'],
+                customer_ward: customer_ward || customerInfo['customer_ward'],
+                customer_address: customer_address || customerInfo['customer_address']
             }
         }]
     ).then(data => {
@@ -234,19 +233,19 @@ exports.forgotPassword = async (req, res) => {
                 data: data
             });
         }
-    }).catch(err =>{
-        return res.status(400).json({message: "Không thể thay đổi password!"});
+    }).catch(err => {
+        return res.status(400).json({ message: "Không thể thay đổi password!" });
     })
 }
 
 // Retrieve all Tutorials from the database.
-exports.findAll = async(req, res) => {
+exports.findAll = async (req, res) => {
     const { search, currentPage, sort } = req.query;
     let orderBy = -1;
-    if(sort && sort === 'asc'){
+    if (sort && sort === 'asc') {
         orderBy = 1;
     }
-    
+
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const customer = await CUSTOMER.aggregate([
         { $match: search ? { $text: { $search: search } } : {} },
@@ -260,7 +259,7 @@ exports.findAll = async(req, res) => {
             status: 'Success',
             data: pagData,
             meta: pagInfo,
-            countPage: Math.ceil(count/10)
+            countPage: Math.ceil(count / 10)
         });
     }
     ).catch(async (err) => {
@@ -270,25 +269,46 @@ exports.findAll = async(req, res) => {
     });
 };
 
-exports.login = async(req, res) =>{
-    const {username, password} = req.body;
+exports.login = async (req, res) => {
+    const { username, password } = req.body;
     const md5 = require('md5');
-    if (!(username && password)){
+    if (!(username && password)) {
         return res.status(400).send({
             message: "Phải nhập đầy đủ thông tin đăng nhập!"
-        }); 
+        });
     }
 
     await CUSTOMER.findOne({
-        customer_phone: username 
-    }, async(err, user) => {
-        if(err) throw err;
-        if(!user){
+        customer_phone: username
+    }, async (err, user) => {
+        if (err) throw err;
+        if (!user) {
             res.status(401).json({ message: 'Không tìm thấy username!!!' });
-        } else if(user) {
-            if(md5(password) !== user.customer_pass){
+        } else if (user) {
+            if (md5(password) !== user.customer_pass) {
                 res.status(401).json({ message: "Mật khẩu không đúng!!!" });
             } else {
+                let countCart = 0
+                const cart = await CART.aggregate([{ $match: { fk_customer: user.customer_id } }]);
+                if(cart) countCart = cart.length;
+
+                await Object.values(tree).map((item) => {
+                    if (user['customer_province'] && item.code == user['customer_province']) {
+                        user['province_name'] = item.name;
+                        const dist = item.district;
+                        Object.values(dist).map((distItem) => {
+                            if (user['customer_district'] && distItem.code == user['customer_district']) {
+                                user['district_name'] = distItem.name
+                                const ward = distItem.ward;
+                                Object.values(ward).map((wardItem) => {
+                                    if (user['customer_ward'] && wardItem.code == user['customer_ward']) {
+                                        user['ward_name'] = wardItem.name
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
                 try {
                     const userData = {
                         id: user.customer_id,
@@ -297,9 +317,9 @@ exports.login = async(req, res) =>{
                     }
                     const accessToken = await jwtHelper.generateToken(userData, accessTokenSecret, accessTokenLife);
                     const refreshToken = await jwtHelper.generateToken(userData, refreshTokenSecret, refreshTokenLife);
-    
-                    tokenList[refreshToken] = {userData, refreshToken, accessToken};
-                    
+
+                    tokenList[refreshToken] = { userData, refreshToken, accessToken };
+
                     return res.status(200).json({
                         token: tokenList[refreshToken],
                         user: user
@@ -312,10 +332,10 @@ exports.login = async(req, res) =>{
     })
 };
 
-exports.refreshToken = async(req, res) =>{
+exports.refreshToken = async (req, res) => {
     const refreshTokenFromClient = req.body.refreshToken;
 
-    if(refreshTokenFromClient && tokenList[refreshTokenFromClient]){
+    if (refreshTokenFromClient && tokenList[refreshTokenFromClient]) {
         try {
             const decoded = await jwtHelper.verifyToken(refreshTokenFromClient, refreshTokenSecret);
 
@@ -323,7 +343,7 @@ exports.refreshToken = async(req, res) =>{
 
             const accessToken = await jwtHelper.generateToken(userData, accessTokenSecret, accessTokenLife);
 
-            return res.status(200).json({accessToken});
+            return res.status(200).json({ accessToken });
         } catch (error) {
             debug(error);
 
@@ -336,4 +356,37 @@ exports.refreshToken = async(req, res) =>{
             message: "No token provided"
         });
     }
+};
+
+exports.getUserInfo = async (req, res) => {
+    const user = req.jwtDecoded
+
+    await CUSTOMER.findOne({ customer_id: user.dat.id })
+        .then(async info => {
+            if(!info){
+                return res.status(400).json({message: "Không tìm thấy thông tin khách hàng"})
+            } else {
+                await Object.values(tree).map((item) => {
+                    if (info['customer_province'] && item.code == info['customer_province']) {
+                        info['province_name'] = item.name;
+                        const dist = item.district;
+                        Object.values(dist).map((distItem) => {
+                            if (info['customer_district'] && distItem.code == info['customer_district']) {
+                                info['district_name'] = distItem.name
+                                const ward = distItem.ward;
+                                Object.values(ward).map((wardItem) => {
+                                    if (info['customer_ward'] && wardItem.code == info['customer_ward']) {
+                                        info['ward_name'] = wardItem.name
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+                return res.status(200).json({user: info})
+            }
+        })
+        .catch(err => {
+            return res.status(500).json({message: "Có lỗi xảy ra!"})
+        })
 }

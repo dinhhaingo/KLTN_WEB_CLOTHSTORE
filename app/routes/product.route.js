@@ -4,7 +4,7 @@ const bodyParser = require("body-parser");
 const app = express()
 
 const corsOptions1 = {
-    origin: "http://192.168.0.105:4200",
+    origin: "http://192.168.0.100:4200",
     optionsSuccessStatus: 200
 };
 

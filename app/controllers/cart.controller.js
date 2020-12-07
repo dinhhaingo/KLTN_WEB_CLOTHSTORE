@@ -10,6 +10,7 @@ dbase.mongoose = mongoose;
 exports.insertToCart = async (req, res) => {
     const user = req.jwtDecoded;
     const { product_id, qty } = req.body;
+    console.log(user)
 
     if (!(product_id && qty)) {
         res.status(400).send({ message: "Content can not be empty!" });
@@ -34,6 +35,7 @@ exports.insertToCart = async (req, res) => {
             }
         ]);
         let message = "";
+        console.log(cart)
         if (cart[0]) {
             const quantity = parseInt(qty) + cart[0]['cart_product_qty'];
             if (product['product_qty'] < quantity) {

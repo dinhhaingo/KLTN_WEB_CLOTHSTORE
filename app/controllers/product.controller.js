@@ -22,20 +22,13 @@ exports.create = async (req, res) => {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
     }
-    // const uploadImage = await cloudinary.uploads(product_images[0]);
-    // arrImage.push(uploadImage.url);
+
     if (product_images) {
-        product_images.forEach(async (image) => {
-            // try {
-            const uploadImage = await cloudinary.uploads(image);
-            console.log(uploadImage.url);
+        for(let i = 0; i < product_images.length; i++){
+            const uploadImage = await cloudinary.uploads(product_images[i]);
             arrImage.push(uploadImage.url);
-            // } catch (error) {
-            //     message = "Không thể upload hình ảnh!";
-            // }
-        });
+        }
     }
-    console.log(arrImage);
 
     if (product_discount) {
         paid_price = (100 - product_discount) * product_unit_price / 100;

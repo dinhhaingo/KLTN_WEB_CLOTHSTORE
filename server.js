@@ -10,7 +10,7 @@ const app = express();
 //     optionsSuccessStatus: 200
 // };
 var corsOptions1 = {
-    origin: "http://192.168.0.100:4200",
+    origin: "http://192.168.0.103:4200",
     optionsSuccessStatus: 200
 };
 

@@ -9,7 +9,7 @@ const authMiddleware = require('../middleware/AuthMiddleware');
 //     optionsSuccessStatus: 200
 // };
 const corsOptions1 = {
-    origin: "http://192.168.0.100:4200",
+    origin: "http://192.168.0.103:4200",
     optionsSuccessStatus: 200
 };
 

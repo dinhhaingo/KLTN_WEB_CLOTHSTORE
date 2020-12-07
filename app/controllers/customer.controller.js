@@ -138,6 +138,7 @@ exports.updateProfile = async (req, res) => {
     if (customer_avatar && isChange) {
         const uploadImage = await cloudinary.uploads(customer_avatar);
         linkImage = uploadImage.url;
+        console.log(linkImage)
     }
     const customerInfo = await CUSTOMER.findOne({ customer_id: user.data.id });
 
@@ -160,11 +161,11 @@ exports.updateProfile = async (req, res) => {
             }
         }]
     ).then(data => {
-        if (!data) {
-            return res.status(404).send({ message: "Không thể update thông tin người dùng!" });
-        } else {
-            res.status(200).send({ message: "Update thông tin thành công!!!" });
-        }
+        console.log(data)
+        res.status(200).send({ 
+            message: "Update thông tin thành công!!!",
+            data: data
+        });
     }).catch(err => {
         res.status(200).send({ message: "Không thể update thông tin người dùng" });
     });
@@ -290,7 +291,7 @@ exports.login = async (req, res) => {
             } else {
                 let countCart = 0
                 const cart = await CART.aggregate([{ $match: { fk_customer: user.customer_id } }]);
-                if(cart) countCart = cart.length;
+                if (cart) countCart = cart.length;
 
                 await Object.values(tree).map((item) => {
                     if (user['customer_province'] && item.code == user['customer_province']) {
@@ -361,32 +362,27 @@ exports.refreshToken = async (req, res) => {
 exports.getUserInfo = async (req, res) => {
     const user = req.jwtDecoded
 
-    await CUSTOMER.findOne({ customer_id: user.dat.id })
-        .then(async info => {
-            if(!info){
-                return res.status(400).json({message: "Không tìm thấy thông tin khách hàng"})
-            } else {
-                await Object.values(tree).map((item) => {
-                    if (info['customer_province'] && item.code == info['customer_province']) {
-                        info['province_name'] = item.name;
-                        const dist = item.district;
-                        Object.values(dist).map((distItem) => {
-                            if (info['customer_district'] && distItem.code == info['customer_district']) {
-                                info['district_name'] = distItem.name
-                                const ward = distItem.ward;
-                                Object.values(ward).map((wardItem) => {
-                                    if (info['customer_ward'] && wardItem.code == info['customer_ward']) {
-                                        info['ward_name'] = wardItem.name
-                                    }
-                                });
+    const info = await CUSTOMER.findOne({ customer_id: user.data.id })
+    if (!info) {
+        return res.status(400).json({ message: "Không tìm thấy thông tin khách hàng" })
+    } else {
+        await Object.values(tree).map((item) => {
+            if (info['customer_province'] && item.code == info['customer_province']) {
+                info['province_name'] = item.name;
+                const dist = item.district;
+                Object.values(dist).map((distItem) => {
+                    if (info['customer_district'] && distItem.code == info['customer_district']) {
+                        info['district_name'] = distItem.name
+                        const ward = distItem.ward;
+                        Object.values(ward).map((wardItem) => {
+                            if (info['customer_ward'] && wardItem.code == info['customer_ward']) {
+                                info['ward_name'] = wardItem.name
                             }
                         });
                     }
                 });
-                return res.status(200).json({user: info})
             }
-        })
-        .catch(err => {
-            return res.status(500).json({message: "Có lỗi xảy ra!"})
-        })
+        });
+        return res.status(200).json({ user: info })
+    }
 }

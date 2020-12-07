@@ -14,10 +14,15 @@ dbase.mongoose = mongoose;
 
 exports.insertSaleOrder = async (req, res) => {
     const user = req.jwtDecoded;
-    const data = req.body;
+    const data = req.body.data;
+    const paymentType = req.body.paymentType;
 
     if (!data){
         return res.status(500).json("Content can not be empty!");
+    }
+    let payType = 1;
+    if(paymentType !== "COD" ){
+        payType = 0;
     }
     
     let orderId = null
@@ -30,7 +35,8 @@ exports.insertSaleOrder = async (req, res) => {
         order_customer_name: data[0]['customer_name'],
         order_customer_phone: data[0]['customer_phone'],
         order_customer_address: data[0]['customer_address'],
-        order_status: 1
+        order_status: 1,
+        order_is_cod: payType 
     });
 
     order
@@ -88,11 +94,8 @@ exports.insertSaleOrder = async (req, res) => {
 
                     PRODUCT.updateOne(
                         { product_id: productInfo['product_id'] },
-                        [{ $set: { product_qty: remaining } }]
+                        { $set: { product_qty: remaining } }
                     )
-                    .catch(err => {
-                        message.push(err);
-                    })
                 })
                 .catch(err => {
                     message.push(err);
@@ -102,6 +105,19 @@ exports.insertSaleOrder = async (req, res) => {
             message.push(err);
         });
     });
+
+    if(!message){
+        if(paymentType === "momo"){
+            const data = {
+                "accessKey": "CgPSueK0mhvJaOkx",
+                "partnerCode": "MOMOPVSI20201203",
+                "requestType": "captureMoMoWallet",
+                "notifyUrl": "",
+                "returnUrl": "",
+                "orderId": ""
+            }
+        }
+    }
 
     return res.status(200).json({
         orderId: orderId,

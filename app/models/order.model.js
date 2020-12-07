@@ -7,6 +7,7 @@ module.exports = mongoose => {
         order_customer_phone: String,
         order_customer_name: String,
         order_status_fk: Number,
+        order_is_cod: Number,
         order_payment_success_at: Date,
         order_payment_fail_at: Date
       },

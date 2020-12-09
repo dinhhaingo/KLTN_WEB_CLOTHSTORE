@@ -10,7 +10,6 @@ dbase.mongoose = mongoose;
 exports.insertToCart = async (req, res) => {
     const user = req.jwtDecoded;
     const { product_id, qty } = req.body;
-    console.log(user)
 
     if (!(product_id && qty)) {
         res.status(400).send({ message: "Content can not be empty!" });
@@ -35,7 +34,6 @@ exports.insertToCart = async (req, res) => {
             }
         ]);
         let message = "";
-        console.log(cart)
         if (cart[0]) {
             const quantity = parseInt(qty) + cart[0]['cart_product_qty'];
             if (product['product_qty'] < quantity) {
@@ -139,29 +137,24 @@ exports.updateQty = async (req, res) => {
         if (cart) {
             let totalCart = 0
             let total = 0
-            cart.forEach(async item => {
-                if(item['fk_product'] == parseInt(product_id)){
-                    try {
-                        await CART.updateOne(
-                            { cart_id: cart[0]['cart_id'] },
-                            { $set: { cart_product_qty: qty } }
-                        )
-                        total = product['product_paid_price'] * qty
-                        totalCart += total
-                        
-                    } catch (error) {
-                        return res.status(500).json({ message: "Có lỗi xảy ra!" })
-                    }
+            for(let i = 0; i < cart.length; i++){
+                if (cart[i]['fk_product'] == parseInt(product_id)) {
+                    await CART.updateOne(
+                        { cart_id: cart[0]['cart_id'] },
+                        { $set: { cart_product_qty: qty } }
+                    )
+                    total = product['product_paid_price'] * qty
+                    totalCart += total
                 } else {
-                    totalCart += (item['cart_product_qty'] * product['product_paid_price'])
+                    totalCart += (cart[i]['cart_product_qty'] * product['product_paid_price'])
                 }
-                return res.status(200).json({
-                    message: "Update thành công!",
-                    qty: qty,
-                    total: total,
-                    totalCart: totalCart
-                })
-            });
+            }
+            return res.status(200).json({
+                message: "Update thành công!",
+                qty: qty,
+                total: total,
+                totalCart: totalCart
+            })
         } else {
             res.status(400).json({ message: "Không tìm thấy sản phẩm trong giỏ hàng!" });
         }

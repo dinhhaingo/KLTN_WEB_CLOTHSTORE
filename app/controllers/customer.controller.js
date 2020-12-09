@@ -1,7 +1,7 @@
 const db = require("../models/index/index");
 const CUSTOMER = db.customer;
 const CART = db.cart;
-const { cloudinary } = require('../config/cd.config');
+const cloudinary = require('../config/cd.config');
 const jwtHelper = require('../helper/jwt.helper');
 const Auth = require('../middleware/AuthMiddleware');
 const paginateInfo = require('paginate-info');
@@ -127,7 +127,8 @@ exports.verifyCustomer = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
     const user = req.jwtDecoded;
-    const { customer_fullName, customer_avatar, customer_gender, customer_birthday, customer_province, customer_district, customer_ward, customer_address, isChange } = req.body.data;
+    const { customer_fullName, customer_avatar, customer_gender, customer_birthday, customer_province, customer_district, customer_ward, customer_address } = req.body.data;
+    const isChange = req.body.isChange;
 
     if (!req.body) {
         return res.status(400).send({ message: "Dữ liệu không được rỗng!" });
@@ -135,10 +136,9 @@ exports.updateProfile = async (req, res) => {
 
     const encode = require('nodejs-base64-encode');
     let linkImage = ''
-    if (customer_avatar && isChange) {
+    if (customer_avatar && parseInt(isChange) === 1) {
         const uploadImage = await cloudinary.uploads(customer_avatar);
         linkImage = uploadImage.url;
-        console.log(linkImage)
     }
     const customerInfo = await CUSTOMER.findOne({ customer_id: user.data.id });
 
@@ -160,12 +160,15 @@ exports.updateProfile = async (req, res) => {
                 customer_address: customer_address || customerInfo['customer_address']
             }
         }]
-    ).then(data => {
-        console.log(data)
-        res.status(200).send({ 
-            message: "Update thông tin thành công!!!",
-            data: data
-        });
+    )
+    .then(async data => {
+        const customer = await CUSTOMER.findOne({ customer_id: user.data.id })
+        if(customer){
+            res.status(200).send({ 
+                message: "Update thông tin thành công!!!",
+                data: customer
+            });
+        }
     }).catch(err => {
         res.status(200).send({ message: "Không thể update thông tin người dùng" });
     });
@@ -174,11 +177,7 @@ exports.updateProfile = async (req, res) => {
 exports.changePassword = async (req, res) => {
     const user = req.jwtDecoded;
     const { newPass, confirmPass } = req.body;
-
-    if (!user.data.id) {
-        return res.status(400).json({ message: "Không tồn tại trạng thái đăng nhập!" });
-    }
-
+    
     if (newPass !== confirmPass) {
         return res.status(400).json({ message: "Confirm Password không đúng!" });
     }

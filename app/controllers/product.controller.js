@@ -3,7 +3,7 @@ const dbase = require("../models/index");
 const PRODUCT = dbase.product;
 const ORDERDETAIL = dbase.orderDetail
 const mongoose = require("mongoose");
-const cloudinary = require('../config/cd.config'); 
+const cloudinary = require('../config/cd.config');
 const encode = require('nodejs-base64-encode');
 const paginateInfo = require('paginate-info')
 
@@ -24,7 +24,7 @@ exports.create = async (req, res) => {
     }
 
     if (product_images) {
-        for(let i = 0; i < product_images.length; i++){
+        for (let i = 0; i < product_images.length; i++) {
             const uploadImage = await cloudinary.uploads(product_images[i]);
             arrImage.push(uploadImage.url);
         }
@@ -353,7 +353,7 @@ exports.getAllClient = async (req, res) => {
     let max = 0;
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 9);
     const product = await PRODUCT.aggregate([
-        { $match: { $and: [type ? { product_type_fk: parseInt(type) } : {}, { product_status: true } ] } },
+        { $match: { $and: [type ? { product_type_fk: parseInt(type) } : {}, { product_status: true }] } },
         { $sort: { product_paid_price: orderBy } },
         {
             $lookup:
@@ -449,19 +449,20 @@ exports.getProductHot = async (req, res) => {
         { $unwind: '$product_size' }
 
     ]).then(async (data) => {
-        prod.forEach(product => {
-            const date = product['createdAt'];
-            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        while (prod.length !== 3) {
+            data.forEach(product => {
+                const date = product['createdAt'];
+                product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
 
-            orderDetail.forEach(order => {
-                if (product['product_id'] == order['_id']) {
-                    prod.push(product);
-                    prod['total'] = order['total'];
-                    prod['count'] = order['count'];
-                }
+                orderDetail.forEach(order => {
+                    if (product['product_id'] == order['_id']) {
+                        prod.push(product);
+                        prod['total'] = order['total'];
+                        prod['count'] = order['count'];
+                    }
+                });
             });
-
-        });
+        }
 
         await res.status(200).json({
             status: 'Success',
@@ -479,7 +480,7 @@ exports.searchProduct = async (req, res) => {
     const search = req.query.search;
 
     const product = await PRODUCT.aggregate([
-        { $match: { $and: [ search ? { $text: { $search: search } } : {}, { product_status: true } ] } },
+        { $match: { $and: [search ? { $text: { $search: search } } : {}, { product_status: true }] } },
         {
             $lookup:
             {
@@ -527,7 +528,7 @@ exports.getById = async (req, res) => {
     }
 
     await PRODUCT.aggregate([
-        { $match: { $and: [ name ? { product_name: name } : {}, { product_status: true } ] } },
+        { $match: { $and: [name ? { product_name: name } : {}, { product_status: true }] } },
         {
             $lookup:
             {

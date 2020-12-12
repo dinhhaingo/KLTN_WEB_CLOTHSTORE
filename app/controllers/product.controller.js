@@ -1,7 +1,9 @@
 const { query } = require("express");
 const dbase = require("../models/index");
 const PRODUCT = dbase.product;
-const ORDERDETAIL = dbase.orderDetail
+const ORDERDETAIL = dbase.orderDetail;
+const RATING = dbase.productRating;
+const COMMENT = dbase.productComment;
 const mongoose = require("mongoose");
 const cloudinary = require('../config/cd.config');
 const encode = require('nodejs-base64-encode');
@@ -95,7 +97,30 @@ exports.getAll = async (req, res) => {
         }
 
     ]).then(async (data) => {
-        data.forEach(product => {
+        data.forEach(async product => {
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] }}])
+            
+            let avgRating = 0;
+            let countRating = 0;
+            let countComment = 0;
+
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+            
+            if(comment){
+                countComment = comment.length;
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
             const date = product['createdAt'];
             product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
         });
@@ -268,10 +293,31 @@ exports.getProductDiscount = async (req, res) => {
         },
         { $unwind: '$product_size' }
     ]).then(async (data) => {
-        data.forEach(product => {
+        data.forEach(async product => {
             if (product['product_unit_price'] > product['product_paid_price'] && product['product_status'] === true) {
                 const date = product['createdAt'];
                 product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+
+                const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+                const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+                
+                let avgRating = 0;
+                let countRating = 0;
+                let countComment = 0;
+
+                if (rating) {
+                    countRating = rating.length
+                    let sumRating = 0;
+                    rating.forEach(item => {
+                        sumRating += item['product_rating_value'];
+                    });
+                    avgRating = sumRating / rating.length
+                }
+                if(comment) countComment = comment.length
+
+                product['countComment'] = countComment;
+                product['countRating'] = countRating;
+                product['avgRating'] = avgRating;
                 prod.push(product);
             }
         });
@@ -319,7 +365,29 @@ exports.getProductRandom = async (req, res) => {
             prod.push(data[Math.floor(Math.random() * data.length)])
         }
 
-        prod.forEach(product => {
+        prod.forEach(async product => {
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
+
+            if(comment) {
+                countComment = comment.length;
+            }
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
             const date = product['createdAt'];
             product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
         });
@@ -377,9 +445,30 @@ exports.getAllClient = async (req, res) => {
         { $unwind: "$product_size" }
     ]).then(async (data) => {
         min = max = data[0]['product_paid_price'];
-        data.forEach(product => {
+        data.forEach(async product => {
             if (min > product['product_paid_price']) min = product['product_paid_price'];
             if (max < product['product_paid_price']) max = product['product_paid_price'];
+
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{$match: { fk_product: product['product_id'] }}])
+            
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
+
+            if(comment) countComment = comment.length;
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
 
             const date = product['createdAt'];
             product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
@@ -450,9 +539,30 @@ exports.getProductHot = async (req, res) => {
 
     ]).then(async (data) => {
         while (prod.length !== 3) {
-            data.forEach(product => {
+            data.forEach(async product => {
                 const date = product['createdAt'];
                 product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+
+                const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+                const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+                
+                let countComment = 0;
+                let avgRating = 0;
+                let countRating = 0;
+
+                if(comment) countComment = comment.length;
+                if (rating) {
+                    countRating = rating.length
+                    let sumRating = 0;
+                    rating.forEach(item => {
+                        sumRating += item['product_rating_value'];
+                    });
+                    avgRating = sumRating / rating.length
+                }
+
+                product['countComment'] = countComment;
+                product['countRating'] = countRating;
+                product['avgRating'] = avgRating;
 
                 orderDetail.forEach(order => {
                     if (product['product_id'] == order['_id']) {
@@ -502,7 +612,28 @@ exports.searchProduct = async (req, res) => {
         },
         { $unwind: "$product_size" }
     ]).then(async (data) => {
-        data.forEach(product => {
+        data.forEach(async product => {
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
+
+            if(comment) countComment = comment.length;
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+
             const date = product['createdAt'];
             product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
         });
@@ -548,22 +679,47 @@ exports.getById = async (req, res) => {
                 as: 'product_size'
             }
         },
-        { $unwind: '$product_size' }
-    ]).then(data => {
-        if (!data) {
-            res.status(404).send({ message: "Không tìm thấy sản phẩm " });
+        { $unwind: '$product_size' },
+        {
+            $lookup:
+            {
+                from: 'product_comments',
+                localField: 'product_id',
+                foreignField: 'fk_product',
+                as: 'product_comment'
+            }
         }
-        else {
-            data.forEach(product => {
-                const date = product['createdAt'];
-                product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
-            });
+    ]).then(async data => {
+        data.forEach(async product => {
+            const rating = await RATING.aggregate( [ { $match: { fk_product: product['product_id'] } } ] )
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
 
-            res.status(200).json({
-                status: 'Success',
-                data: data
-            });
-        }
+            if(comment) countComment = comment.length;
+            if(rating){
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        });
+
+        res.status(200).json({
+            status: 'Success',
+            data: data
+        });
     }).catch(err => {
         res.status(500).json({ message: "Error retrieving Tutorial with id=" + id });
     });

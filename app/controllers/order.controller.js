@@ -7,10 +7,20 @@ const ORDERDETAIL = dbase.orderDeatail;
 const mongoose = require("mongoose");
 const jwtHelper = require('../helper/jwt.helper');
 const paginateInfo = require('paginate-info');
+const crypto = require('crypto-js');
 
 const debug = console.log.bind(console);
 
 dbase.mongoose = mongoose;
+
+const partnerCode = "MOMOPVSI20201203";
+const accessKey = "CgPSueK0mhvJaOkx";
+const requestType = "captureMoMoWallet";
+const secretKey = "1e9JBSSU6Om2nvIds7EI3w4uiawh5fML";
+const orderInfo = "H2 team";
+const returnUrl = "";
+const notifyUrl = "";
+const extraData = "";
 
 exports.insertSaleOrder = async (req, res) => {
     const user = req.jwtDecoded;
@@ -28,6 +38,7 @@ exports.insertSaleOrder = async (req, res) => {
     let orderId = null
     let orderDeatailId = []
     let message = [];
+    let amount = 0;
 
     const order = new ORDER({
         order_id: await dbase.autoIncrement('order'),
@@ -91,7 +102,7 @@ exports.insertSaleOrder = async (req, res) => {
                     orderDeatailId.push(result['order_detail_id']);
 
                     const remaining = productInfo['product_qty'] - product['qty'];
-
+                    amount += result['order_detail_qty'] * result['order_detail_paid_price'];
                     PRODUCT.updateOne(
                         { product_id: productInfo['product_id'] },
                         { $set: { product_qty: remaining } }
@@ -108,14 +119,34 @@ exports.insertSaleOrder = async (req, res) => {
 
     if(!message){
         if(paymentType === "momo"){
-            const data = {
-                "accessKey": "CgPSueK0mhvJaOkx",
-                "partnerCode": "MOMOPVSI20201203",
-                "requestType": "captureMoMoWallet",
-                "notifyUrl": "",
-                "returnUrl": "",
-                "orderId": ""
-            }
+
+            const rawSign = "partnerCode=" + partnerCode
+                        + "&accessKey=" + accessKey
+                        + "&requestId=" + orderId
+                        + "&amount=" + amount
+                        + "&orderId=" + orderId
+                        + "&orderInfo=" + orderInfo
+                        + "&returnUrl=" + returnUrl
+                        + "&notifyUrl=" + notifyUrl
+                        + "&extraData=" + extraData;
+
+            const signature = crypto.createHmac('sha256', secretKey)
+                                    .update(rawSign)
+                                    .digest('hex');
+
+            const data = JSON.stringify({
+                "accessKey": accessKey,
+                "partnerCode": partnerCode,
+                "requestType": requestType,
+                "notifyUrl": notifyUrl,
+                "returnUrl": returnUrl,
+                "orderId": orderId,
+                "amount": amount,
+                "orderInfo": orderInfo,
+                "requestId": orderId,
+                "extraData": extraData,
+                "signature": signature
+            });
         }
     }
 

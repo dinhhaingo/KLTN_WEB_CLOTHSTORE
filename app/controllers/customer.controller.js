@@ -176,28 +176,43 @@ exports.updateProfile = async (req, res) => {
 
 exports.changePassword = async (req, res) => {
     const user = req.jwtDecoded;
-    const { newPass, confirmPass } = req.body;
+    const { customer_password, customer_newPass, customer_reNewPass } = req.body.data;
     
-    if (newPass !== confirmPass) {
+    if (customer_newPass !== customer_reNewPass) {
         return res.status(400).json({ message: "Confirm Password không đúng!" });
     }
-
-    CUSTOMER.updateOne(
-        { customer_phone: user.data.username },
-        [{
-            $set: {
-                customer_password: newPass
+    const customerInfo = await CUSTOMER.findOne({ customer_id: user.data.id })
+    if(customerInfo){
+        if (customerInfo['customer_pass'] === md5(customer_password)){
+            if(customer_password === customer_newPass){
+                return res.status(500).json({message: "Trùng mật khẩu cũ, không thể đổi!"})
             }
-        }]
-    ).then(data => {
-        if (!data) {
-            return res.status(400).json({ message: "Không thể cập nhật mật khẩu!" });
+            try {
+                await CUSTOMER.updateOne(
+                    { customer_id: user.data.id },
+                    {
+                        $set: 
+                        {
+                            customer_pass: md5(customer_newPass)
+                        }
+                    }
+                );
+                // 
+            } catch (error) {
+                return res.status(400).json({ message: "Không thể thay đổi mật khẩu", error: error });
+            }
         } else {
-            return res.status(200).json({ message: "Thay đổi mật khẩu thành công!" });
+            return res.status(500).json({ message: "Mật khẩu không đúng" })
         }
-    }).catch(err => {
-        return res.status(400).json({ message: "Không thể thay đổi mật khẩu", error: err });
-    });
+    } else {
+        return res.status(500).json({message: "Không tìm thấy thông tin khách hàng!"})
+    }
+    customerInfo['customer_pass'] = md5(customer_newPass)
+
+    return res.status(200).json({
+        message: "Đổi mật khẩu thành công!",
+        data : customerInfo
+    })
 }
 
 exports.forgotPassword = async (req, res) => {

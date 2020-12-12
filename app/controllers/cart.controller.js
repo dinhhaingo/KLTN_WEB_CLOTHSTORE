@@ -68,10 +68,34 @@ exports.insertToCart = async (req, res) => {
         }
         await CART.aggregate([
             { $match: { fk_customer: user.data.id } }
-        ]).then(data => {
+        ]).then(async data => {
             if (data) {
+                const cart = await CART.aggregate([
+                    { $match: { fk_customer: user.data.id } },
+                    { $sort: { cart_id: -1 } },
+                    {
+                        $lookup:
+                        {
+                            from: 'products',
+                            localField: 'fk_product',
+                            foreignField: 'product_id',
+                            as: 'productInfo'
+                        }
+                    },
+                    { $unwind: '$productInfo' }
+                ]);
+
+                let total = 0;
+                if (cart) {
+                    cart.forEach(item => {
+                        item['total'] = item['productInfo']['product_paid_price'] * item['cart_product_qty']
+                        total += (item['productInfo']['product_paid_price'] * item['cart_product_qty'])
+                    });
+                }
                 return res.status(200).json({
                     message: message,
+                    cart: cart,
+                    total: total,
                     count: data.length
                 })
             } else {
@@ -80,7 +104,6 @@ exports.insertToCart = async (req, res) => {
         }).catch(err => {
             return res.status(200).json({ message: message })
         });
-
     }
 };
 

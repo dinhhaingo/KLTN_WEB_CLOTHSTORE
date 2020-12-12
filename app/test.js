@@ -1,121 +1,81 @@
-//libs
-import React, { useContext, useState, useEffect } from 'react'
-import { Form, Input, Select } from 'antd';
-//others
-import './style.scss'
-import { layoutForm } from '@/constants/layout'
-//context
-import { DetailOrderContext } from '@/context/DetailOrderContext'
-import { useRouter } from '@/hooks';
-//json address
-const tree = require('@/addressVN/tree')
+const https = require('https');
+//parameters send to MoMo get get payUrl
+var endpoint = "https://test-payment.momo.vn/gw_payment/transactionProcessor"
+var hostname = "https://test-payment.momo.vn"
+var path = "/gw_payment/transactionProcessor"
+var partnerCode = "MOMO"
+var accessKey = "F8BBA842ECF85"
+var serectkey = "K951B6PE1waDMi640xX08PD3vg6EkVlz"
+var orderInfo = "pay with MoMo"
+var returnUrl = "https://momo.vn/return"
+var notifyurl = "https://callback.url/notify"
+var amount = "50000"
+var orderId = "MM1540456472575"
+var requestId = 'MM1540456472575'
+var requestType = "captureMoMoWallet"
+var extraData = "merchantName=;merchantId=" //pass empty value if your merchant does not have stores else merchantName=[storeName]; merchantId=[storeId] to identify a transaction map with a physical store
 
-const { Option } = Select;
-const { TextArea } = Input
+//before sign HMAC SHA256 with format
+//partnerCode=$partnerCode&accessKey=$accessKey&requestId=$requestId&amount=$amount&orderId=$oderId&orderInfo=$orderInfo&returnUrl=$returnUrl&notifyUrl=$notifyUrl&extraData=$extraData
+var rawSignature = "partnerCode="+partnerCode+"&accessKey="+accessKey+"&requestId="+requestId+"&amount="+amount+"&orderId="+orderId+"&orderInfo="+orderInfo+"&returnUrl="+returnUrl+"&notifyUrl="+notifyurl+"&extraData="+extraData
+//puts raw signature
+console.log("--------------------RAW SIGNATURE----------------")
+console.log(rawSignature)
+//signature
+const crypto1 = require('crypto-js');
+const signature = crypto1.HmacSHA1(rawSignature, serectkey)
+// const cryptojs = require('crypto-js/hmac-sha256');
+// var signature = cryptojs(rawSignature, serectkey);
 
-interface Props {
-    record?: any,
-}
+console.log("--------------------SIGNATURE----------------")
+console.log(signature)
 
-const PaymentDetails: React.FC<Props> = () => {
-    const param = useRouter().query.id 
-    const [isDisable, setIsDisable] = useState(false)
-    const { order, orderChange } = useContext(DetailOrderContext)
-    const [form] = Form.useForm();
-    const [district, setDistrict] = useState([])
-    const [ward, setWard] = useState([])    
+//json object send to MoMo endpoint
+var body = JSON.stringify({
+    partnerCode : partnerCode,
+    accessKey : accessKey,
+    requestId : requestId,
+    amount : amount,
+    orderId : orderId,
+    orderInfo : orderInfo,
+    returnUrl : returnUrl,
+    notifyUrl : notifyurl,
+    extraData : extraData,
+    requestType : requestType,
+    signature : base64(signature),
+})
+//Create the HTTPS objects
+var options = {
+  hostname: 'test-payment.momo.vn',
+  port: 443,
+  path: '/gw_payment/transactionProcessor',
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+ }
+};
 
-    const handleOnChange = async () => {
-        let value = await form.getFieldsValue()
-        let temp = { ...value }
-        if (orderChange) {
-            orderChange({ paymentDetail: temp })
-        }
-    }
-    // FIX TO HERE
+//Send the request and get the response
+console.log("Sending....")
+var req = https.request(options, (res) => {
+  console.log(`Status: ${res.statusCode}`);
+  console.log(`Headers: ${JSON.stringify(res.headers)}`);
+  res.setEncoding('utf8');
+  res.on('data', (body) => {
+    console.log('Body');
+    console.log(body);
+    console.log('payURL');
+    console.log(JSON.parse(body).payUrl);
+  });
+  res.on('end', () => {
+    console.log('No more data in response.');
+  });
+});
 
-    const handleProvinceOnChange = async (value: any, key: any) =>{
-        await setDistrict([])
-        await setWard([])
-        await form.setFieldsValue({district: undefined, ward:undefined})
-        await setDistrict(tree[(key.key)][`quan-huyen`])
-        let result = await form.getFieldsValue()
-        let temp = { ...result, provinceCity: value, district: undefined, ward: undefined }
-        if (orderChange) {
-            orderChange({ paymentDetail: temp })
-        }
-    }
+req.on('error', (e) => {
+  console.log(`problem with request: ${e.message}`);
+});
 
-    const handleDistrictOnChange = async (value: any, key:any)=>{
-        await setWard([])
-        await form.setFieldsValue({ward:undefined})
-        await setWard(district[(key.key)][`xa-phuong`])
-        let result = await form.getFieldsValue()
-        let temp = { ...result, district: value, ward: undefined }
-        if (orderChange) {
-            orderChange({ paymentDetail: temp })
-        }
-    }
-
-    const handleWardOnChange = async (value: any, key: any)=>{
-        let result = await form.getFieldsValue()
-        let temp = { ...result, ward: value }
-        if (orderChange) {
-            orderChange({ paymentDetail: temp })
-        }
-    }
-    useEffect(() => {
-        if(!order.paymentDetail){
-        }else{
-            form.setFieldsValue(order.paymentDetail)
-        }
-        if(param){
-            setIsDisable(true)
-        }
-    }, [form, order.paymentDetail, param])
-
-    return (
-        <Form name='payment' form={form} {...layoutForm} onChange={handleOnChange}>
-            <Form.Item label='Payment Method' name='paymentMethod'>
-                <Select onSelect={handleOnChange} placeholder='select payment method...' disabled={isDisable} >
-                    <Option value='1'>
-                        buy at the store
-                    </Option>
-                    <Option value='2'>
-                        remote purchase
-                    </Option>
-                </Select>
-            </Form.Item>
-            <Form.Item label='Delivery Option' name='deliveryOption'>
-                <Select onSelect={handleOnChange} placeholder='select delivery option...' disabled={isDisable}>
-                    <Option value='1'>
-                        Standard Delivery
-                    </Option>
-                    <Option value='2'>
-                        Instant Delivery
-                    </Option>
-                </Select>
-            </Form.Item>
-            <Form.Item label='Province/City' name='provinceCity'>
-                <Select onChange={handleProvinceOnChange} placeholder='select province/city...' disabled={isDisable} >
-                    {Object.values(tree).map((item: any) => <Option key={item.code} value={item.name}>{item.name}</Option>)}
-                </Select>
-            </Form.Item>
-            <Form.Item label='District' name='district'>
-                <Select onChange={handleDistrictOnChange} placeholder='select district...' disabled={isDisable}>
-                    {Object.values(district).map((item: any) => <Option key={item.code} value={item.name}>{item.name}</Option>)}
-                </Select>
-            </Form.Item>
-            <Form.Item label='Ward' name='ward'>
-                <Select onChange={handleWardOnChange}  placeholder='select ward...' disabled={isDisable}>
-                    {Object.values(ward).map((item: any) => <Option key={item.code} value={item.name}>{item.name}</Option>)}
-                </Select>
-            </Form.Item>
-            <Form.Item label='Address' name='address'>
-                <TextArea rows={4} placeholder='input the address...' disabled={isDisable}/>
-            </Form.Item>
-        </Form>
-    )
-}
-
-export default PaymentDetails
+// write data to request body
+req.write(body);
+req.end();

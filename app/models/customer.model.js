@@ -9,9 +9,9 @@ module.exports = mongoose => {
         customer_birthday: Date,
         customer_phone: String,
         customer_pass: String,
-        customer_province: Number,
-        customer_district: Number,
-        customer_ward: Number,
+        customer_province: String,
+        customer_district: String,
+        customer_ward: String,
         customer_address: String
     }, { timestamps: true });
 

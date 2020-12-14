@@ -1,6 +1,6 @@
 const { query } = require("express");
 const dbase = require("../models/index");
-const COMMENT = dbase.ProductComment;
+const COMMENT = dbase.productComment;
 const PRODUCT = dbase.product;
 const mongoose = require("mongoose");
 const jwtHelper = require('../helper/jwt.helper');
@@ -53,7 +53,7 @@ exports.commentByCustomer = async (req, res) => {
                     message = "Bình luận sản phẩm thất bại!"
                 });
         }
-        await RATING.aggregate([
+        await COMMENT.aggregate([
             { $match: { fk_customer: user.data.id } }
         ]).then(data => {
                 return res.status(200).json({
@@ -68,7 +68,7 @@ exports.commentByCustomer = async (req, res) => {
 };
 
 exports.getByProductId = async(req, res) => {
-    const product_id = req.body.product_id
+    const product_id = req.query.product_id
 
     if(!product_id) return res.status(500).json({message: "Thiếu thông tin sản phẩm!"})
 
@@ -76,8 +76,9 @@ exports.getByProductId = async(req, res) => {
     if (!product) {
         return res.status(401).json({ message: "Sản phẩm không tồn tại" })
     } else {
-        await COMMENT.aggregate([{$match:{$and:[{ fk_product: product_id }]}}])
-        .then(data => {
+        await COMMENT.aggregate([
+            {$match:{ fk_product: product_id }}
+        ]).then(data => {
             return res.status(200).json({data: data})
         })
         .catch(err => {
@@ -85,6 +86,6 @@ exports.getByProductId = async(req, res) => {
                 message: "Không có comment nào cho sản phẩm",
                 error: err
             })
-        })
+        });
     }
 }

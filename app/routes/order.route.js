@@ -22,7 +22,7 @@ module.exports = app => {
 
     router.get("/get-all", order.getAll);
 
-    router.put("/get-by-customer", order.getByCustomer);
+    router.get("/get-by-customer", order.getByCustomer);
 
     app.use('/order', router);
 };

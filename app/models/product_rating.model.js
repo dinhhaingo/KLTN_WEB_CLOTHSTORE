@@ -4,7 +4,8 @@ module.exports = mongoose => {
         product_rating_id: Number,
         product_rating_value: Number,
         fk_customer: Number,
-        fk_product: Number
+        fk_product: Number,
+        product_rating_review: String
       },
       { timestamps: true }
     );

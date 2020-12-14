@@ -47,15 +47,15 @@ app.get("/", (req, res) => {
 // require("./app/routes/customer_voucher.route")(app);
 require("./app/routes/customer.route")(app);
 // require("./app/routes/district.route")(app);
-// require("./app/routes/order_detail.route")(app);
+require("./app/routes/order_detail.route")(app);
 // require("./app/routes/order_status.route")(app);
 require("./app/routes/order.route")(app);
 require("./app/routes/product.route")(app);
 require("./app/routes/employee.route")(app);
 require("./app/routes/employee_role.route")(app);
 
-// require("./app/routes/product_comment.route")(app);
-// require("./app/routes/product_rating.route")(app);
+require("./app/routes/product_comment.route")(app);
+require("./app/routes/product_rating.route")(app);
 require("./app/routes/product_size.route")(app);
 require("./app/routes/product_type.route")(app);
 require("./app/routes/province.route")(app);

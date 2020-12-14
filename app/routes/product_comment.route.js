@@ -20,7 +20,7 @@ module.exports = app => {
 
     var router = require("express").Router();
 
-    router.get("get-by-product", cors(corsOptions1), comment.getByProductId);
+    router.get("/get-by-product", cors(corsOptions1), comment.getByProductId);
 
     router.use(authMiddleware.isAuth);
 

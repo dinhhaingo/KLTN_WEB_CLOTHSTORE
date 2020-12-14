@@ -252,7 +252,7 @@ exports.getByCustomer = async(req, res) =>{
     
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const order = await ORDER.aggregate([
-        { $match: { $and: [ { customer_fk: customer.id}, { order_fk_status: status || 1} ] } },
+        { $match: { $and: [ { customer_fk: customer.data.id}, status ? { order_status_fk: parseInt(status)} : {} ] } },
         { $sort: { order_id: orderBy } },
         {
             $lookup:

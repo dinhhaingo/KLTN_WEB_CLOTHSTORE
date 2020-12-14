@@ -9,13 +9,13 @@ dbase.mongoose = mongoose;
 
 exports.rateByCustomer = async (req, res) => {
     const user = req.jwtDecoded;
-    const { product_id, value } = req.body;
+    const { product_id, value, review } = req.body;
 
-    if (!(product_id && value)) {
+    if (!(product_id && value && review)) {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
     }
-    const product = await PRODUCT.findOne({ product_id: product_id })
+    const product = await PRODUCT.findOne({ product_id: parseInt(product_id) })
     if (!product) {
         return res.status(401).json({ message: "Sản phẩm không tồn tại" })
     } else {
@@ -26,7 +26,7 @@ exports.rateByCustomer = async (req, res) => {
                     $and:
                         [
                             { fk_customer: user.data.id },
-                            { fk_product: product_id }
+                            { fk_product: parseInt(product_id) }
                         ]
                 }
             }
@@ -39,7 +39,8 @@ exports.rateByCustomer = async (req, res) => {
                 product_rating_id: await dbase.autoIncrement('rating'),
                 fk_customer: user.data.id,
                 fk_product: product_id,
-                product_rating_value: value
+                product_rating_value: value ? parseInt(value) : 0,
+                product_rating_review: review
             });
 
             newRating
@@ -65,3 +66,51 @@ exports.rateByCustomer = async (req, res) => {
 
     }
 };
+
+exports.getByProductId = async(req, res) => {
+    const product_id = req.query.product_id
+    const star = req.query.number_star
+    console.log(req.query.number_star)
+
+    if(!product_id) return res.status(500).json({message: "Thiếu thông tin sản phẩm!"})
+
+    const product = await PRODUCT.findOne({ product_id: parseInt(product_id) })
+    if (!product) {
+        return res.status(401).json({ message: "Sản phẩm không tồn tại" })
+    } else {
+        await RATING.aggregate([
+            {
+                $match:
+                    { 
+                        $and: 
+                        [
+                            {fk_product: parseInt(product_id) }, 
+                            star ? { product_rating_value: parseInt(star)} : {} 
+                        ]
+                    }
+            },
+            {
+                $lookup:
+                {
+                    from: 'customers',
+                    localField: 'fk_customer',
+                    foreignField: 'customer_id',
+                    as: 'customer_info'
+                }
+            },
+            { $unwind: '$customer_info' }
+        ]).then(data => {
+            data.forEach(rate => {
+                const date = rate['createdAt'];
+                rate['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            });
+            return res.status(200).json({data: data})
+        })
+        .catch(err => {
+            return res.status(500).json({
+                message: "Không có đánh giá nào cho sản phẩm",
+                error: err
+            })
+        });
+    }
+}

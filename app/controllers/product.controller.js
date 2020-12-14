@@ -99,8 +99,8 @@ exports.getAll = async (req, res) => {
     ]).then(async (data) => {
         data.forEach(async product => {
             const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
-            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] }}])
-            
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+
             let avgRating = 0;
             let countRating = 0;
             let countComment = 0;
@@ -113,8 +113,8 @@ exports.getAll = async (req, res) => {
                 });
                 avgRating = sumRating / rating.length
             }
-            
-            if(comment){
+
+            if (comment) {
                 countComment = comment.length;
             }
 
@@ -300,7 +300,7 @@ exports.getProductDiscount = async (req, res) => {
 
                 const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
                 const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
-                
+
                 let avgRating = 0;
                 let countRating = 0;
                 let countComment = 0;
@@ -313,7 +313,7 @@ exports.getProductDiscount = async (req, res) => {
                     });
                     avgRating = sumRating / rating.length
                 }
-                if(comment) countComment = comment.length
+                if (comment) countComment = comment.length
 
                 product['countComment'] = countComment;
                 product['countRating'] = countRating;
@@ -368,12 +368,12 @@ exports.getProductRandom = async (req, res) => {
         prod.forEach(async product => {
             const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
             const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
-            
+
             let countComment = 0;
             let avgRating = 0;
             let countRating = 0;
 
-            if(comment) {
+            if (comment) {
                 countComment = comment.length;
             }
             if (rating) {
@@ -450,13 +450,13 @@ exports.getAllClient = async (req, res) => {
             if (max < product['product_paid_price']) max = product['product_paid_price'];
 
             const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
-            const comment = await COMMENT.aggregate([{$match: { fk_product: product['product_id'] }}])
-            
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+
             let countComment = 0;
             let avgRating = 0;
             let countRating = 0;
 
-            if(comment) countComment = comment.length;
+            if (comment) countComment = comment.length;
             if (rating) {
                 countRating = rating.length
                 let sumRating = 0;
@@ -504,7 +504,6 @@ exports.getAllClient = async (req, res) => {
 exports.getProductHot = async (req, res) => {
     let prod = [];
     const orderDetail = await ORDERDETAIL.aggregate([
-        { $match: { product_status: true } },
         {
             $group: {
                 _id: "$product_fk",
@@ -512,10 +511,13 @@ exports.getProductHot = async (req, res) => {
                 count: { $sum: 1 }
             }
         },
-        { $sort: { "count": -1 } }
+        { $sort: { "total": -1 } }
     ]);
 
+    console.log(orderDetail)
+
     const product = await PRODUCT.aggregate([
+        { $match: { product_status: true } },
         {
             $lookup:
             {
@@ -538,41 +540,56 @@ exports.getProductHot = async (req, res) => {
         { $unwind: '$product_size' }
 
     ]).then(async (data) => {
-        while (prod.length !== 3) {
-            data.forEach(async product => {
-                const date = product['createdAt'];
-                product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        let temp = 1;
 
-                const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
-                const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
-                
-                let countComment = 0;
-                let avgRating = 0;
-                let countRating = 0;
+        data.forEach(async product => {
+            while(prod.length < 3)
+            if (product['product_id'] === orderDetail[0]['_id']) {
+                product['total'] = orderDetail[0]['total'];
+                product['count'] = orderDetail[0]['count'];
+                prod.push(product);
+                temp += 1
+            } else if (product['product_id'] === orderDetail[1]['_id']) {
+                product['total'] = orderDetail[1]['total'];
+                product['count'] = orderDetail[1]['count'];
+                prod.push(product);
+                temp += 1
+            } else if (product['product_id'] === orderDetail[2]['_id']) {
+                product['total'] = orderDetail[2]['total'];
+                product['count'] = orderDetail[2]['count'];
+                prod.push(product);
+                temp += 1
+            }
+            if (prod.length < 3) {
+                // break
+            }
+        });
+        console.log(orderDetail)
+        prod.forEach(async product => {
+            // const date = product['createdAt'];
+            // product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
 
-                if(comment) countComment = comment.length;
-                if (rating) {
-                    countRating = rating.length
-                    let sumRating = 0;
-                    rating.forEach(item => {
-                        sumRating += item['product_rating_value'];
-                    });
-                    avgRating = sumRating / rating.length
-                }
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            // const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            console.log(prod)
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
 
-                product['countComment'] = countComment;
-                product['countRating'] = countRating;
-                product['avgRating'] = avgRating;
-
-                orderDetail.forEach(order => {
-                    if (product['product_id'] == order['_id']) {
-                        prod.push(product);
-                        prod['total'] = order['total'];
-                        prod['count'] = order['count'];
-                    }
+            // if(comment) countComment = comment.length;
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
                 });
-            });
-        }
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+        });
 
         await res.status(200).json({
             status: 'Success',
@@ -615,12 +632,12 @@ exports.searchProduct = async (req, res) => {
         data.forEach(async product => {
             const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
             const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
-            
+
             let countComment = 0;
             let avgRating = 0;
             let countRating = 0;
 
-            if(comment) countComment = comment.length;
+            if (comment) countComment = comment.length;
             if (rating) {
                 countRating = rating.length
                 let sumRating = 0;
@@ -679,27 +696,18 @@ exports.getById = async (req, res) => {
                 as: 'product_size'
             }
         },
-        { $unwind: '$product_size' },
-        {
-            $lookup:
-            {
-                from: 'product_comments',
-                localField: 'product_id',
-                foreignField: 'fk_product',
-                as: 'product_comment'
-            }
-        }
+        { $unwind: '$product_size' }
     ]).then(async data => {
         data.forEach(async product => {
-            const rating = await RATING.aggregate( [ { $match: { fk_product: product['product_id'] } } ] )
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
             const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
-            
+
             let countComment = 0;
             let avgRating = 0;
             let countRating = 0;
 
-            if(comment) countComment = comment.length;
-            if(rating){
+            if (comment) countComment = comment.length;
+            if (rating) {
                 countRating = rating.length
                 let sumRating = 0;
                 rating.forEach(item => {

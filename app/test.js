@@ -3,9 +3,9 @@ const https = require('https');
 var endpoint = "https://test-payment.momo.vn/gw_payment/transactionProcessor"
 var hostname = "https://test-payment.momo.vn"
 var path = "/gw_payment/transactionProcessor"
-var partnerCode = "MOMO"
-var accessKey = "F8BBA842ECF85"
-var serectkey = "K951B6PE1waDMi640xX08PD3vg6EkVlz"
+var partnerCode = "MOMOPVSI20201203"
+var accessKey = "CgPSueK0mhvJaOkx"
+var serectkey = "1e9JBSSU6Om2nvIds7EI3w4uiawh5fML"
 var orderInfo = "pay with MoMo"
 var returnUrl = "https://momo.vn/return"
 var notifyurl = "https://callback.url/notify"
@@ -19,11 +19,14 @@ var extraData = "merchantName=;merchantId=" //pass empty value if your merchant 
 //partnerCode=$partnerCode&accessKey=$accessKey&requestId=$requestId&amount=$amount&orderId=$oderId&orderInfo=$orderInfo&returnUrl=$returnUrl&notifyUrl=$notifyUrl&extraData=$extraData
 var rawSignature = "partnerCode="+partnerCode+"&accessKey="+accessKey+"&requestId="+requestId+"&amount="+amount+"&orderId="+orderId+"&orderInfo="+orderInfo+"&returnUrl="+returnUrl+"&notifyUrl="+notifyurl+"&extraData="+extraData
 //puts raw signature
-console.log("--------------------RAW SIGNATURE----------------")
-console.log(rawSignature)
 //signature
-const crypto1 = require('crypto-js');
-const signature = crypto1.HmacSHA1(rawSignature, serectkey)
+const cr = require('crypto-js');
+const crypto1 = require('crypto-js/hmac-sha256');
+const base64 = require('crypto-js/enc-base64')
+const sha256 = require('crypto-js/sha256');
+// const signature = base64.stringify(crypto1(rawSignature, serectkey))
+// const signature = sha256(rawSignature)
+const signature = base64.stringify(cr.HmacSHA256(rawSignature, serectkey))
 // const cryptojs = require('crypto-js/hmac-sha256');
 // var signature = cryptojs(rawSignature, serectkey);
 
@@ -42,7 +45,7 @@ var body = JSON.stringify({
     notifyUrl : notifyurl,
     extraData : extraData,
     requestType : requestType,
-    signature : base64(signature),
+    signature : signature,
 })
 //Create the HTTPS objects
 var options = {
@@ -52,7 +55,7 @@ var options = {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json'
- }
+  }
 };
 
 //Send the request and get the response

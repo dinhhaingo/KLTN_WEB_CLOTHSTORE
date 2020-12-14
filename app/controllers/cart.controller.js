@@ -19,7 +19,7 @@ exports.insertToCart = async (req, res) => {
     if (!product) {
         return res.status(401).json({ message: "Sản phẩm không tồn tại" })
     } else if (product['product_qty'] < qty) {
-        return res.status(500).json({ message: "Sản phẩm hết hàng!" })
+        return res.status(500).json({ message: "Sản phẩm không đủ hàng!" })
     } else {
         const cart = await CART.aggregate([
             {
@@ -36,12 +36,13 @@ exports.insertToCart = async (req, res) => {
         let message = "";
         if (cart[0]) {
             const quantity = parseInt(qty) + cart[0]['cart_product_qty'];
+            
             if (product['product_qty'] < quantity) {
-                return res.status(500).json({ message: "Sản phẩm hết hàng!" })
+                return res.status(500).json({ message: "Sản phẩm không đủ hàng!" })
             }
             try {
                 await CART.updateOne(
-                    { $and: [{ fk_customer: user.data.id }, { fk_product: product_id }] },
+                    { $and: [{ fk_customer: user.data.id }, { fk_product: parseInt(product_id) }] },
                     { $set: { cart_product_qty: quantity } }
                 )
                 message = "Thêm giỏ hàng thành công!";
@@ -49,7 +50,7 @@ exports.insertToCart = async (req, res) => {
                 return res.status(500).json({ message: "Có lỗi xảy ra!" })
             }
         } else {
-            const newCart = new CART({
+            const newCart = await new CART({
                 cart_id: await dbase.autoIncrement('cart'),
                 fk_customer: user.data.id,
                 fk_product: product_id,
@@ -66,41 +67,38 @@ exports.insertToCart = async (req, res) => {
                     message = "Thêm giỏ hàng thất bại!"
                 });
         }
+
         await CART.aggregate([
             { $match: { fk_customer: user.data.id } }
         ]).then(async data => {
-            if (data) {
-                const cart = await CART.aggregate([
-                    { $match: { fk_customer: user.data.id } },
-                    { $sort: { cart_id: -1 } },
+            const cart = await CART.aggregate([
+                { $match: { fk_customer: user.data.id } },
+                { $sort: { cart_id: -1 } },
+                {
+                    $lookup:
                     {
-                        $lookup:
-                        {
-                            from: 'products',
-                            localField: 'fk_product',
-                            foreignField: 'product_id',
-                            as: 'productInfo'
-                        }
-                    },
-                    { $unwind: '$productInfo' }
-                ]);
+                        from: 'products',
+                        localField: 'fk_product',
+                        foreignField: 'product_id',
+                        as: 'productInfo'
+                    }
+                },
+                { $unwind: '$productInfo' }
+            ]);
 
-                let total = 0;
-                if (cart) {
-                    cart.forEach(item => {
-                        item['total'] = item['productInfo']['product_paid_price'] * item['cart_product_qty']
-                        total += (item['productInfo']['product_paid_price'] * item['cart_product_qty'])
-                    });
-                }
-                return res.status(200).json({
-                    message: message,
-                    cart: cart,
-                    total: total,
-                    count: data.length
-                })
-            } else {
-                return res.status(200).json({ message: message })
+            let total = 0;
+            if (cart) {
+                cart.forEach(item => {
+                    item['total'] = item['productInfo']['product_paid_price'] * item['cart_product_qty']
+                    total += (item['productInfo']['product_paid_price'] * item['cart_product_qty'])
+                });
             }
+            return res.status(200).json({
+                message: message,
+                cart: cart,
+                total: total,
+                count: data.length
+            })
         }).catch(err => {
             return res.status(200).json({ message: message })
         });
@@ -160,7 +158,7 @@ exports.updateQty = async (req, res) => {
         if (cart) {
             let totalCart = 0
             let total = 0
-            for(let i = 0; i < cart.length; i++){
+            for (let i = 0; i < cart.length; i++) {
                 if (cart[i]['fk_product'] == parseInt(product_id)) {
                     await CART.updateOne(
                         { cart_id: cart[0]['cart_id'] },

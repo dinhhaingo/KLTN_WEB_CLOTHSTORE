@@ -57,7 +57,6 @@ exports.create = (req, res) => {
 
 exports.register = async (req, res) => {
     const { fullName, phoneNumber, passWord, rePass } = req.body.user;
-
     if (!(phoneNumber && fullName && passWord)) {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
@@ -74,7 +73,7 @@ exports.register = async (req, res) => {
     }
     // Create a Tutorial
     const customer = new CUSTOMER({
-        customer_id: await dbase.autoIncrement('customer'),
+        customer_id: await db.autoIncrement('customer'),
         customer_fullName: fullName,
         customer_avatar: linkImage,
         customer_gender: null,
@@ -111,7 +110,7 @@ exports.verifyCustomer = async (req, res) => {
     if (!customer) {
         return res.status(400).json({ message: "Người dùng không tồn tại!" });
     }
-    await EMPLOYEE.updateOne(
+    await CUSTOMER.updateOne(
         { 'customer_phone': phone },
         [{ $set: { 'customer_verify': 1 } }]
     ).then(async (data) => {

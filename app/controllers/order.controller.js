@@ -264,7 +264,27 @@ exports.getByCustomer = async(req, res) =>{
             }
         },
         { $unwind: '$order_status'},
+        {
+            $lookup:
+            {
+                from: 'order_details',
+                localField: 'order_id',
+                foreignField: 'order_fk',
+                as: 'order_detail'
+            }
+        }
     ]).then(async (data) => {
+        for(let i = 0; i < data.length; i++){
+            const detail = data[i]['order_detail'];
+            for(let j = 0; j < detail.length; j++) {
+                const productInfo = await PRODUCT.findOne({product_id: detail['product_fk']})
+                if(productInfo){
+                    detail['productInfo'] = productInfo;
+                }
+            };
+            const date = data[i]['createAt'];
+            data[i]['createAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        };
         const count = data.length;
         const pagData = data.slice(offset, offset + limit);
         const pagInfo = paginateInfo.paginate(currentPage, count, pagData);

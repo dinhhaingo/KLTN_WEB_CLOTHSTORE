@@ -70,7 +70,6 @@ exports.rateByCustomer = async (req, res) => {
 exports.getByProductId = async(req, res) => {
     const product_id = req.query.product_id
     const star = req.query.number_star
-    console.log(req.query.number_star)
 
     if(!product_id) return res.status(500).json({message: "Thiếu thông tin sản phẩm!"})
 

@@ -7,7 +7,8 @@ const ORDERDETAIL = dbase.orderDeatail;
 const mongoose = require("mongoose");
 const jwtHelper = require('../helper/jwt.helper');
 const paginateInfo = require('paginate-info');
-const crypto = require('crypto-js');
+const crypto = require('crypto');
+const https = require('https');
 
 const debug = console.log.bind(console);
 
@@ -147,6 +148,58 @@ exports.insertSaleOrder = async (req, res) => {
                 "extraData": extraData,
                 "signature": signature
             });
+
+            let options = {
+                hostname: 'test-payment.momo.vn',
+                port: 443,
+                path: '/gw_payment/transactionProcessor',
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Content-Length': Buffer.byteLength(data)
+                }
+            };
+            let result;
+            let req = https.request(options, (response) => {
+                response.setEncoding('utf8');
+                response.on('data', (body) => {
+                    result = JSON.parse(body)
+                })
+            });
+
+            req.on('error', (e) => {
+                message = e.message;
+            });
+            req.write(body);
+            req.end();
+
+            if(!result){
+                message.push('Giao dịch thất bại!');
+                await ORDER.updateOne(
+                    { order_id: orderId },
+                    { 
+                        $set: 
+                        {
+                            $and: 
+                                [
+                                    { order_payment_fail_at: new Date},
+                                    { order_status_fk: 4 }
+                                ]
+                        }   
+                    }
+                )
+            } else {
+                let messageMo
+                switch (result.errorCode) {
+                    case 9043:
+                        messageMo = "Khách hàng chưa liên kết tài khoản ngân hàng";
+                        break;
+                    case 80: 
+                        messageMo = "Xác thực khách hàng không thành công";
+                        break;
+                    case 63
+                }
+            }
         }
     }
 
@@ -276,14 +329,20 @@ exports.getByCustomer = async(req, res) =>{
     ]).then(async (data) => {
         for(let i = 0; i < data.length; i++){
             const detail = data[i]['order_detail'];
+            let total = 0;
             for(let j = 0; j < detail.length; j++) {
-                const productInfo = await PRODUCT.findOne({product_id: detail['product_fk']})
+                const productInfo = await PRODUCT.findOne({product_id: detail[j]['product_fk']})
                 if(productInfo){
-                    detail['productInfo'] = productInfo;
+                    detail[j]['productInfo'] = productInfo;
                 }
+                const sum = detail[j]['order_detail_paid_price'] * detail[j]['order_detail_qty'];
+                detail[j]['total'] = sum;
+                total += sum;
             };
-            const date = data[i]['createAt'];
-            data[i]['createAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            data[i]['total'] = total;
+            data[i]['order_detail'] = detail;
+            const date = data[i]['createdAt'];
+            data[i]['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
         };
         const count = data.length;
         const pagData = data.slice(offset, offset + limit);

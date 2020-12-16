@@ -9,16 +9,17 @@ const jwtHelper = require('../helper/jwt.helper');
 const paginateInfo = require('paginate-info');
 const crypto = require('crypto');
 const https = require('https');
+const { nextTick } = require("process");
 
 const debug = console.log.bind(console);
 
 dbase.mongoose = mongoose;
 
-const partnerCode = "MOMOPVSI20201203";
-const accessKey = "CgPSueK0mhvJaOkx";
+const partnerCodeReq = "MOMOPVSI20201203";
+const accessKeyReq = "CgPSueK0mhvJaOkx";
 const requestType = "captureMoMoWallet";
 const secretKey = "1e9JBSSU6Om2nvIds7EI3w4uiawh5fML";
-const orderInfo = "H2 team";
+const orderInfoReq = "H2 team";
 const returnUrl = "";
 const notifyUrl = "";
 const extraData = "";
@@ -48,7 +49,8 @@ exports.insertSaleOrder = async (req, res) => {
         order_customer_phone: data[0]['customer_phone'],
         order_customer_address: data[0]['customer_address'],
         order_status: 1,
-        order_is_cod: payType 
+        order_is_cod: payType, 
+        order_qr_url:''
     });
 
     order
@@ -77,7 +79,7 @@ exports.insertSaleOrder = async (req, res) => {
             
             if(product['voucher']){
                 const voucherInfo = VOUCHER.findOne({voucher_code: product['voucher']});
-                const today = new Date();
+                const today = new Date()();
                 if(voucherInfo && voucherInfo['voucher_available_at'] <= today 
                 && voucherInfo['voucher_expired_at'] >= today 
                 && voucherInfo['voucher_status'] == true 
@@ -118,15 +120,19 @@ exports.insertSaleOrder = async (req, res) => {
         });
     });
 
+    let status = 200;
+    let qrCodeUrl = '';
+    let urlPayMo = '';
+
     if(!message){
         if(paymentType === "momo"){
 
-            const rawSign = "partnerCode=" + partnerCode
-                        + "&accessKey=" + accessKey
+            const rawSign = "partnerCode=" + partnerCodeReq
+                        + "&accessKey=" + accessKeyReq
                         + "&requestId=" + orderId
                         + "&amount=" + amount
                         + "&orderId=" + orderId
-                        + "&orderInfo=" + orderInfo
+                        + "&orderInfo=" + orderInfoReq
                         + "&returnUrl=" + returnUrl
                         + "&notifyUrl=" + notifyUrl
                         + "&extraData=" + extraData;
@@ -136,14 +142,14 @@ exports.insertSaleOrder = async (req, res) => {
                                     .digest('hex');
 
             const data = JSON.stringify({
-                "accessKey": accessKey,
-                "partnerCode": partnerCode,
+                "accessKey": accessKeyReq,
+                "partnerCode": partnerCodeReq,
                 "requestType": requestType,
                 "notifyUrl": notifyUrl,
                 "returnUrl": returnUrl,
                 "orderId": orderId,
                 "amount": amount,
-                "orderInfo": orderInfo,
+                "orderInfo": orderInfoReq,
                 "requestId": orderId,
                 "extraData": extraData,
                 "signature": signature
@@ -160,7 +166,9 @@ exports.insertSaleOrder = async (req, res) => {
                 }
             };
             let result;
+            let status;
             let req = https.request(options, (response) => {
+                status = response.statusCode
                 response.setEncoding('utf8');
                 response.on('data', (body) => {
                     result = JSON.parse(body)
@@ -172,9 +180,45 @@ exports.insertSaleOrder = async (req, res) => {
             });
             req.write(body);
             req.end();
+            
+            let errMo = false 
+            if(statusCode !== 200 
+                || result.errorCode !== 0 
+                || orderId !== result.requestId 
+                || orderId !== result.orderId 
+                || result.requestType !== requestType){
+                errMo = true
+            } else {
+                const rawSignRes = "requestId=" + result.requestId
+                                 + "&orderId=" + result.orderId
+                                 + "&message=" + result.message
+                                 + "&localMessage=" + result.localMessage
+                                 + "&payUrl=" + result.payUrl
+                                 + "&errorCode=" + result.errorCode
+                                 + "&requestType=" + result.requestType;
+                const signatureRes = crypto.createHmac('sha256', secretKey)
+                                           .update(rawSignRes)
+                                           .digest('hex');
 
-            if(!result){
-                message.push('Giao dịch thất bại!');
+                if(signatureRes !== result.signature){
+                    errMo = true
+                } else {
+                    message.push('Đặt hàng thành công');
+                    status = 200;
+                    qrCodeUrl = result.qrCodeUrl
+                    urlPayMo = result.payUrl
+
+                    await ORDER.updateOne(
+                        { order_id: orderId },
+                        { $set: { order_qr_url: qrCodeUrl } }
+                    )
+                }
+            }
+
+            if(errMo){
+                message.push('Đặt hàng thất bại!');
+                status = 500;
+
                 await ORDER.updateOne(
                     { order_id: orderId },
                     { 
@@ -182,31 +226,161 @@ exports.insertSaleOrder = async (req, res) => {
                         {
                             $and: 
                                 [
-                                    { order_payment_fail_at: new Date},
+                                    { order_payment_fail_at: new Date()},
                                     { order_status_fk: 4 }
                                 ]
                         }   
                     }
                 )
             } else {
-                let messageMo
-                switch (result.errorCode) {
-                    case 9043:
-                        messageMo = "Khách hàng chưa liên kết tài khoản ngân hàng";
-                        break;
-                    case 80: 
-                        messageMo = "Xác thực khách hàng không thành công";
-                        break;
-                    case 63
-                }
+                status = 500;
             }
         }
     }
 
     return res.status(200).json({
+        status: status,
         orderId: orderId,
         orderDetail: orderDeatailId,
+        qrCodeUrl: qrCodeUrl || '',
+        urlPayMo: urlPayMo || '',
         message: message
+    })
+};
+
+exports.confirmPaymentMomo = async(req, res) => {
+    const { partnerCode, accessKey, requestId, amount, orderId, orderInfo, orderType, transId, errorCode, message, localMessage, payType, responseTime, extraData, signature } = req.body;
+
+    let code = 0;
+    let messageRes = '';
+    if(partnerCode !== partnerCodeReq || accessKey !== accessKeyReq || orderInfo !== orderInfoReq){
+        code = 58;
+        messageRes = 'Sai thông tin cửa hàng!';
+    } else {
+        const rawSign = "partnerCode=" + partnerCode
+                      + "&accessKey=" + accessKey
+                      + "&requestId=" + requestId
+                      + "&amount=" + amount
+                      + "&orderId=" + orderId
+                      + "&orderInfo=" + orderInfo
+                      + "&orderType=" + orderType
+                      + "&transId=" + transId
+                      + "&message=" + message
+                      + "&localMessage=" + localMessage
+                      + "&responseTime=" + responseTime
+                      + "&errorCode=" + errorCode
+                      + "&payType=" + payType
+                      + "&extraData=" + extraData;
+
+        const sign = crypto.createHmac('sha256', secretKey)
+                           .update(rawSign)
+                           .digest('hex');
+        
+        if(sign !== signature){
+            code = 5;
+            messageRes = 'Sai thông tin chữ kí!';
+        } else {
+            const order = await ORDER.findOne({ order_id: orderId});
+            if(!order){
+                code = 2
+                messageRes = 'Đơn hàng không tồn tại!';
+            } else {
+                const detail = await ORDERDETAIL.aggregate([
+                    { $match: { order_fk: orderId }}
+                ]);
+                if(errorCode === -1 || errorCode === 7){
+                    code = 0;
+                    messageRes = 'Giao dịch đang xử lý!';
+                    next();
+                } else if (errorCode !== 0 || errorCode !== 34){
+                    code = 99;
+                    messageRes = 'Giao dịch không thành công!';
+                    await ORDER.updateOne(
+                        { order_id: orderId },
+                        { 
+                            $set:
+                            {
+                                $and: 
+                                [
+                                    { order_payment_fail_at: new Date() },
+                                    { order_status_fk: 4 },
+                                    { order_qr_url: '' }
+                                ]
+                            }
+                        }
+                    )
+
+                    detail.forEach(item => {
+                        let prod = await PRODUCT.findOne({ product_id: item['product_fk'] })
+
+                        let qty = prod['product_qty'] + item['order_detail_qty'];
+                        await PRODUCT.updateOne(
+                            { product_id: item['product_fk'] },
+                            { $set: { product_qty: qty } }
+                        )
+                    });
+                } else {
+                    let total = 0
+                    detail.forEach(item => {
+                        total += item['order_detail_paid_price'] * item['order_detail_qty']
+                    });
+                    
+                    if(total !== amount || orderType != 'momo_wallet'){
+                        code = 59;
+                        messageRes = 'Thông tin đơn hàng hoặc giao dịch không đúng!';
+                    } else {
+                        code = 0
+                        messageRes = 'Thành công'
+                        await ORDER.updateOne(
+                            { order_id: orderId },
+                            { 
+                                $set:
+                                {
+                                    $and: 
+                                    [
+                                        { order_payment_success_at: new Date() },
+                                        { order_status_fk: 3 },
+                                        { order_qr_url: '' }
+                                    ]
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+    const time = new Date()
+    const resTime = time.getFullYear() + '-' 
+                  + time.getMonth() + '-' 
+                  + time.getDate() + ' ' 
+                  + time.getHours() + ':' 
+                  + time.getMinutes() + ':' 
+                  + time.getSeconds();
+
+    const rawSignRes = "partnerCode=" + partnerCode
+                  + "&accessKey=" + accessKey
+                  + "&requestId=" + requestId
+                  + "&orderId=" + orderId
+                  + "&errorCode=" + code
+                  + "&message=" + messageRes
+                  + "&responseTime=" + resTime
+                  + "&extraData=confirm";
+
+    const signatureRes = crypto.createHmac('sha256', secretKey)
+                    .update(rawSignRes)
+                    .digest('hex');
+    
+    return res.status(200).json({
+        partnerCode: partnerCode,
+        accessKey: accessKey,
+        requestId: requestId,
+        orderId: orderId,
+        errorCode: code,
+        message: messageRes,
+        responseTime: resTime,
+        extraData: 'confim',
+        signature: signatureRes
     })
 }
 
@@ -361,4 +535,3 @@ exports.getByCustomer = async(req, res) =>{
         });
     });
 }
-

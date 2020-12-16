@@ -15,6 +15,8 @@ module.exports = app => {
     const order = require("../controllers/order.controller.js");
 
     var router = require("express").Router();
+    
+    router.post("/confirm-payment", order.confirmPaymentMomo);
 
     router.use(authMiddleware.isAuth);
 

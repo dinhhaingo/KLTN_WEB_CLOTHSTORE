@@ -6,12 +6,13 @@ module.exports = mongoose => {
         employee_password: String,
         employee_phone: String,
         employee_address: String,
-        employee_province: Number,
-        employee_district: Number,
+        employee_province: String,
+        employee_district: String,
+        employee_ward: String,
         employee_role: String,
         employee_avatar: String,
         employee_gender: String,
-        employee_status: Number
+        employee_status: Boolean
     }, { timestamps: false });
 
     schema.method("toJSON", function() {

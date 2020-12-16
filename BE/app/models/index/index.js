@@ -22,6 +22,8 @@ db.province = require("../province.model.js")(mongoose);
 db.voucher = require("../voucher.model.js")(mongoose);
 db.counters = require("../counters.model.js")(mongoose);
 db.employee = require("../employee.model.js")(mongoose);
+db.employeeRole = require("../employee_role.model.js")(mongoose);
+db.cart = require("../cart.model.js")(mongoose);
 
 db.autoIncrement = async (name) => {
         let result = await db.counters.findOne({ id: name })

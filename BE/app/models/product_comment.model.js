@@ -3,8 +3,8 @@ module.exports = mongoose => {
         product_comment_id: Number,
         product_comment_title: String,
         product_comment_message: String,
-        customer_fk: Number,
-        product_fk: Number
+        fk_customer: Number,
+        fk_product: Number
     }, { timestamps: true });
 
     schema.method("toJSON", function() {

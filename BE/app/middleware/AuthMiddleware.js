@@ -4,8 +4,8 @@ const debug = console.log.bind(console);
 const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET || "access-token-secret-kltn-dinhhai-vanhuy";
 
 let isAuth = async(req, res, next) =>{
-    const tokenFromClient = req.body.token || req.query.token || req.headers["Bearer"];
-
+    const tokenFromClient = req.body.token || req.query.token || req.headers["authorization"];
+    
     if(tokenFromClient){
         try {
             const decoded = await jwtHelper.verifyToken(tokenFromClient, accessTokenSecret);

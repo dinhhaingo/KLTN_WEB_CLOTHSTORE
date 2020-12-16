@@ -10,7 +10,7 @@ module.exports = mongoose => {
         product_paid_price: Number,
         product_discount: Number,
         product_description: String,
-        product_status: Number
+        product_status: Boolean
     }, { timestamps: true });
 
     schema.method("toJSON", function() {

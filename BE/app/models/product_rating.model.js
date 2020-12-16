@@ -2,9 +2,10 @@ module.exports = mongoose => {
     var schema = mongoose.Schema(
       {
         product_rating_id: Number,
-        product_rating_value: String,
-        customer_fk: Number,
-        product_fk: Number
+        product_rating_value: Number,
+        fk_customer: Number,
+        fk_product: Number,
+        product_rating_review: String
       },
       { timestamps: true }
     );

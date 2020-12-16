@@ -1,157 +1,213 @@
 const { query } = require("express");
 const dbase = require("../models/index");
 const PRODUCT = dbase.product;
+const ORDERDETAIL = dbase.orderDetail;
+const RATING = dbase.productRating;
+const COMMENT = dbase.productComment;
 const mongoose = require("mongoose");
-const {cloudinary} = require('../config/cd.config');
+const cloudinary = require('../config/cd.config');
 const encode = require('nodejs-base64-encode');
-var base64 = require('base-64');
+const paginateInfo = require('paginate-info')
+
+let base64 = require('base-64');
 
 dbase.mongoose = mongoose;
 
 exports.create = async (req, res) => {
-    const {product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_paid_price, product_discount, product_description, product_images, product_status} = req.body.fashionCreate;
-    
+    const { product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_discount, product_description, product_images } = req.body.fashionCreate;
+
+    let message = '';
+    let arrImage = [];
+    let paid_price = product_unit_price;
+
     if (!product_name) {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
     }
-    
-    const pro = await PRODUCT.findOne({product_name});
-    if(pro){
-        return res.status(400).json({msg: "Sản phẩm đã tồn tại!"})
-    }
-    
-    let message = '';
-    let arrImage = [];
-    console.log('images: ', product_images);
-    if(product_images){
-        console.log('lllllll');
 
-        product_images.forEach(async(image) => {
-            try {
-                // image = await base64.encode(image);
-                const uploadImage = await cloudinary.uploader.upload(image);
-                arrImage.push(uploadImage.url);
-                console.log(uploadImage);
-            } catch (error) {
-                message = "Không thể upload hình ảnh!";
-            }
-        });
+    if (product_images) {
+        for (let i = 0; i < product_images.length; i++) {
+            const uploadImage = await cloudinary.uploads(product_images[i]);
+            arrImage.push(uploadImage.url);
+        }
     }
 
-    // Create a Tutorial
-    const product = new PRODUCT({
+    if (product_discount) {
+        paid_price = (100 - product_discount) * product_unit_price / 100;
+    }
+    const product = await new PRODUCT({
         product_id: await dbase.autoIncrement('product'),
         product_name: product_name,
         product_qty: product_qty,
         product_type_fk: product_type_fk,
         product_size_fk: product_size_fk,
         product_unit_price: product_unit_price,
-        product_paid_price: product_paid_price || product_unit_price,
+        product_paid_price: paid_price,
         product_discount: product_discount,
         product_description: product_description,
         product_images: arrImage,
-        product_status: product_status
+        product_status: true
     });
-    // Save Tutorial in the database
-    product
+
+    await product
         .save(product)
-        .then(async(data) => {
+        .then(async (data) => {
             await res.json({
                 data: data,
                 message: message
             });
         })
-        .catch(async(err) => {
+        .catch(async (err) => {
             await res.status(500).send({
                 message: err.message || "Some error occurred while creating the Tutorial."
             });
         });
 };
 
-// Retrieve all Tutorials from the database.
-exports.findAll = (req, res) => {
-    const id = req.query.product_id;
-    var condition = id ? { product_id: { $regex: new RegExp(id), $options: "i" } } : {};
+exports.getAll = async (req, res) => {
 
-    PRODUCT.find(condition)
-        .then(data => {
-            res.send(data);
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: err.message || "Some error occurred while retrieving tutorials."
-            });
-        });
-};
+    const { search, currentPage, sort, type } = req.query;
 
-exports.getAll = async(req, res) =>{
-    const condition = req.param.search;
-    await PRODUCT.agregate([
-        { $match: { $text: { $search: condition } } },
-        { $sort: { $score: { $meta: 'textScore' } } },
-        { group: { '_id': null, views: { $sum: '$views' } } },
-        { $skip: 0 },
-        { $limit: 10 }
-    ]).then(async(data) => {
-        await res.send(data);
+    let orderBy = -1;
+    if (sort && sort === 'asc') {
+        orderBy = 1;
+    }
+
+    const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
+    const product = await PRODUCT.aggregate([
+        { $match: { $and: [search ? { $text: { $search: search } } : {}, type ? { product_type_fk: parseInt(type) } : {}] } },
+        { $sort: { product_id: orderBy } },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
         }
-    ).catch(async(err) =>{
+
+    ]).then(async (data) => {
+        data.forEach(async product => {
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+
+            let avgRating = 0;
+            let countRating = 0;
+            let countComment = 0;
+
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            if (comment) {
+                countComment = comment.length;
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        });
+        const count = data.length;
+        const pagData = data.slice(offset, offset + limit);
+        const pagInfo = paginateInfo.paginate(currentPage, count, pagData);
+
+        await res.status(200).json({
+            status: 'Success',
+            data: pagData,
+            meta: pagInfo,
+            countPage: Math.ceil(count / 10)
+        });
+    }
+    ).catch(async (err) => {
         await res.status(500).send({
             message: err.message || "Some error occurred while retrieving tutorials."
         });
     });
+
 };
 
-exports.updateProduct = async(req, res) => {
+exports.updateProduct = async (req, res) => {
+    const { product_id, product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_discount, product_description, product_images, product_status, isChange } = req.body.fashionEdit;
+    const pro = await PRODUCT.findOne({ product_id: product_id });
+
+    if (!pro) {
+        return res.status(500).json({ message: "Không tìm thấy sản phẩm!" });
+    }
+
+    let arr = pro.product_images;
+    let paid_price = product_unit_price;
+    let message = '';
+
     if (!req.body) {
         return res.status(400).send({
             message: "Data to update can not be empty!"
         });
     }
-    const {product_id, product_name, product_qty, product_type_fk, product_size_fk, product_unit_price, product_paid_price, product_discount, product_description, product_images, product_status, isChange} = req.body.fashionEdit;
-    console.log(req.body.fashionEdit);
-    if (product_images && isChange){
+    // if (pro.product_name != product_name) {
+    //     res.status(500).json({ message: "Tên sản phẩm đã tồn tại!" });
+    // }
 
-        var arr =[]
-        product_images.forEach(async(image) => {
+    if (product_images && isChange) {
+        arr = [];
+        product_images.forEach(async (image) => {
             try {
-                const uploadImage = await cloudinary.uploader.upload(image, {
-                    upload_preset: 'ml_default'
-                });
+                const uploadImage = await cloudinary.uploads(image);
                 arr.push(uploadImage.url);
             } catch (error) {
-                console.log(error);
+                message = "Không thể update hình ảnh!"
             }
         });
     }
 
+    if (product_discount) {
+        paid_price = (100 - product_discount) * product_unit_price / 100;
+    }
+
     try {
-        await PRODUCT.updateOne(
-            {product_id: product_id},
-            [ { $set: 
-                { 
+        await PRODUCT.update(
+            { product_id: product_id },
+            {
+                $set:
+                {
                     product_images: arr,
                     product_name: product_name,
                     product_qty: product_qty,
                     product_type_fk: product_type_fk,
                     product_size_fk: product_size_fk,
                     product_unit_price: product_unit_price,
-                    product_paid_price: product_paid_price || product_unit_price,
+                    product_paid_price: paid_price,
                     product_discount: product_discount,
                     product_description: product_description,
                     product_status: product_status
-                } 
-            } ] );
-        const product = await PRODUCT.findOne({product_id: product_id});
+                }
+            });
+        const product = await PRODUCT.findOne({ product_id: product_id });
 
-        if(product){
+        if (product) {
             res.status(200).json({
                 message: "Update sản phẩm thành công!",
+                images: message,
                 product: product
             })
         } else {
-            res.status(500).json({message: "Không tìm thấy sản phẩm!!!"});
+            res.status(500).json({ message: "Không tìm thấy sản phẩm!!!" });
         }
     } catch (error) {
         res.status(500).json({
@@ -161,19 +217,19 @@ exports.updateProduct = async(req, res) => {
     }
 }
 
-exports.updateImage = async(req, res) => {
+exports.updateImage = async (req, res) => {
     const { request } = req.body;
     if (!request) {
         return res.status(400).send({
             message: "Data to update can not be empty!"
         });
     }
+    let arr = []
 
-    if (request.product_images){
+    if (request.product_images) {
         const arrImage = request.product_images;
 
-        var arr =[]
-        arrImage.forEach(async(image) => {
+        arrImage.forEach(async (image) => {
             try {
                 const uploadImage = await cloudinary.uploader.upload(image, {
                     upload_preset: 'ml_default'
@@ -187,68 +243,482 @@ exports.updateImage = async(req, res) => {
 
     const id = request.product_id;
 
-    PRODUCT.updateOne({'product_id': id},[ { $set: { 'product_images': arr } } ] )
-    .then(async(data) => {
-        if (!data) {
-            await res.status(404).send({
-                message: `Cannot update PRODUCT with id=${id}. Maybe PRODUCT was not found!`
-            });
-        } else res.send({ message: "PRODUCT was updated successfully." });
-    })
-    .catch(async(err) => {
-        await res.status(500).send({
-            message: "Error updating PRODUCT with id=" + id
-        });
-    });;
-};
-
-// Delete a Tutorial with the specified id in the request
-exports.delete = (req, res) => {
-    const id = req.params.product_id;
-
-    PRODUCT.findbyIdAndRemove(id)
-        .then(data => {
+    PRODUCT.updateOne({ 'product_id': id }, [{ $set: { 'product_images': arr || null } }])
+        .then(async (data) => {
             if (!data) {
-                res.status(404).send({
-                    message: `Cannot delete PRODUCT with id=${id}. Maybe PRODUCT was not found!`
+                await res.status(404).send({
+                    message: `Cannot update PRODUCT with id=${id}. Maybe PRODUCT was not found!`
                 });
-            } else {
-                res.send({
-                    message: "PRODUCT was deleted successfully!"
-                });
+            } else res.send({ message: "PRODUCT was updated successfully." });
+        })
+        .catch(async (err) => {
+            await res.status(500).send({
+                message: "Error updating PRODUCT with id=" + id
+            });
+        });;
+};
+
+exports.getProductDiscount = async (req, res) => {
+
+    const { search, currentPage, sort, type } = req.query;
+
+    let orderBy = -1;
+    if (sort && sort === 'asc') {
+        orderBy = 1;
+    }
+
+    let prod = [];
+
+    const product = await PRODUCT.aggregate([
+        { $match: { $and: [search ? { $text: { $search: search } } : {}, type ? { product_type_fk: parseInt(type) } : {}] } },
+        { $sort: { product_id: orderBy } },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
             }
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: "Could not delete PRODUCT with id=" + id
-            });
+        },
+        { $unwind: '$product_type' },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: '$product_size' }
+    ]).then(async (data) => {
+        data.forEach(async product => {
+            if (product['product_unit_price'] > product['product_paid_price'] && product['product_status'] === true) {
+                const date = product['createdAt'];
+                product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+
+                const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+                const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+
+                let avgRating = 0;
+                let countRating = 0;
+                let countComment = 0;
+
+                if (rating) {
+                    countRating = rating.length
+                    let sumRating = 0;
+                    rating.forEach(item => {
+                        sumRating += item['product_rating_value'];
+                    });
+                    avgRating = sumRating / rating.length
+                }
+                if (comment) countComment = comment.length
+
+                product['countComment'] = countComment;
+                product['countRating'] = countRating;
+                product['avgRating'] = avgRating;
+                prod.push(product);
+            }
         });
+
+        await res.status(200).json({
+            status: 'Success',
+            data: prod
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+
 };
 
-// Delete all Tutorials from the database.
-exports.deleteAll = (req, res) => {
-    PRODUCT.deleteMany({})
-        .then(data => {
-            res.send({
-                message: `${data.deletedCount} PRODUCT were deleted successfully!`
-            });
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: err.message || "Some error occurred while removing all products."
-            });
+exports.getProductRandom = async (req, res) => {
+    let prod = [];
+    const product = await PRODUCT.aggregate([
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: '$product_type' },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: '$product_size' }
+
+    ]).then(async (data) => {
+
+        for (let i = 0; i < 3; i++) {
+            prod.push(data[Math.floor(Math.random() * data.length)])
+        }
+
+        prod.forEach(async product => {
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
+
+            if (comment) {
+                countComment = comment.length;
+            }
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
         });
+
+        await res.status(200).json({
+            status: 'Success',
+            data: prod
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
 };
 
-// Find all published Tutorials
-exports.findAllPublished = (req, res) => {
-    PRODUCT.find({ published: true })
-        .then(data => {
-            res.send(data);
-        })
-        .catch(err => {
-            res.status(500).send({
-                message: err.message || "Some error occurred while retrieving products."
-            });
+exports.getAllClient = async (req, res) => {
+
+    const { currentPage, sort, type, value } = req.query;
+    let val;
+    if (value) {
+        val = JSON.parse(value)
+    };
+    let orderBy = -1;
+    if (sort && sort === 'asc') {
+        orderBy = 1;
+    }
+
+    let prod = [];
+    let min = 0;
+    let max = 0;
+    const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 9);
+    const product = await PRODUCT.aggregate([
+        { $match: { $and: [type ? { product_type_fk: parseInt(type) } : {}, { product_status: true }] } },
+        { $sort: { product_paid_price: orderBy } },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: "$product_type" },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: "$product_size" }
+    ]).then(async (data) => {
+        min = max = data[0]['product_paid_price'];
+        data.forEach(async product => {
+            if (min > product['product_paid_price']) min = product['product_paid_price'];
+            if (max < product['product_paid_price']) max = product['product_paid_price'];
+
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
+
+            if (comment) countComment = comment.length;
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
         });
+        if (value) {
+            data.forEach(product => {
+                if (product['product_paid_price'] >= val.minValue && product['product_paid_price'] <= val.maxValue) {
+                    prod.push(product)
+                }
+            });
+        } else prod = data;
+
+        const count = prod.length;
+        const pagData = prod.slice(offset, offset + limit);
+        const pagInfo = paginateInfo.paginate(currentPage, count, pagData);
+
+        await res.status(200).json({
+            status: 'Success',
+            data: pagData,
+            meta: pagInfo,
+            countPage: Math.ceil(count / 9),
+            minPrice: min,
+            maxPrice: max
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+};
+
+exports.getProductHot = async (req, res) => {
+    let prod = [];
+    const orderDetail = await ORDERDETAIL.aggregate([
+        {
+            $group: {
+                _id: "$product_fk",
+                total: { $sum: "$order_detail_qty" },
+                count: { $sum: 1 }
+            }
+        },
+        { $sort: { "total": -1 } }
+    ]);
+    
+    const product = await PRODUCT.aggregate([
+        { $match: { product_status: true } },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: '$product_type' },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: '$product_size' }
+
+    ]).then(async (data) => {
+        let temp = 1;
+
+        for(let j = 0; j < data.length; j ++){
+            for(let i = 0; i < 3; i++){
+                if (data[j]['product_id'] === orderDetail[i]['_id']) {
+                    data[j]['total'] = orderDetail[i]['total'];
+                    data[j]['count'] = orderDetail[i]['count'];
+                    prod.push(data[j]);
+                }
+                if (prod.length === 3) {
+                    break;
+                }
+            }
+            if (prod.length === 3) {
+                break;
+            }
+        };
+        
+        prod.forEach(async product => {
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            // const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
+
+            // if(comment) countComment = comment.length;
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+        });
+
+        await res.status(200).json({
+            status: 'Success',
+            data: prod
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+};
+
+exports.searchProduct = async (req, res) => {
+    const search = req.query.search;
+
+    const product = await PRODUCT.aggregate([
+        { $match: { $and: [search ? { $text: { $search: search } } : {}, { product_status: true }] } },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: "$product_type" },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: "$product_size" }
+    ]).then(async (data) => {
+        data.forEach(async product => {
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
+
+            if (comment) countComment = comment.length;
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+
+            // const date = product['createdAt'];
+            // product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        });
+
+        await res.status(200).json({
+            status: 'Success',
+            data: data
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+};
+
+// Find a single Tutorial with an id
+exports.getById = async (req, res) => {
+    const name = req.query.name;
+
+    if (!name) {
+        return res.status(500).json({ message: "Sản phẩm không xác định!" })
+    }
+
+    await PRODUCT.aggregate([
+        { $match: { $and: [name ? { product_name: name } : {}, { product_status: true }] } },
+        {
+            $lookup:
+            {
+                from: 'product_types',
+                localField: 'product_type_fk',
+                foreignField: 'product_type_id',
+                as: 'product_type'
+            }
+        },
+        { $unwind: '$product_type' },
+        {
+            $lookup:
+            {
+                from: 'product_sizes',
+                localField: 'product_size_fk',
+                foreignField: 'product_size_id',
+                as: 'product_size'
+            }
+        },
+        { $unwind: '$product_size' }
+    ]).then(async data => {
+        data.forEach(async product => {
+            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
+            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+
+            let countComment = 0;
+            let avgRating = 0;
+            let countRating = 0;
+
+            if (comment) countComment = comment.length;
+            if (rating) {
+                countRating = rating.length
+                let sumRating = 0;
+                rating.forEach(item => {
+                    sumRating += item['product_rating_value'];
+                });
+                avgRating = sumRating / rating.length
+            }
+
+            product['countComment'] = countComment;
+            product['countRating'] = countRating;
+            product['avgRating'] = avgRating;
+
+            const date = product['createdAt'];
+            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        });
+
+        res.status(200).json({
+            status: 'Success',
+            data: data
+        });
+    }).catch(err => {
+        res.status(500).json({ message: "Error retrieving Tutorial with id=" + id });
+    });
 };

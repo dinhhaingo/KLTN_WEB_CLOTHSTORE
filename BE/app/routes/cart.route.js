@@ -30,5 +30,7 @@ module.exports = app => {
 
     router.delete("/delete-cart", cors(corsOptions1), cart.deletecart);
 
+    router.post("/update-to-buy", cors(corsOptions1), cart.updateToBuying);
+
     app.use('/cart', router);
 };

@@ -36,7 +36,7 @@ exports.insertToCart = async (req, res) => {
         let message = "";
         if (cart[0]) {
             const quantity = parseInt(qty) + cart[0]['cart_product_qty'];
-            
+
             if (product['product_qty'] < quantity) {
                 return res.status(500).json({ message: "Sản phẩm không đủ hàng!" })
             }
@@ -54,7 +54,8 @@ exports.insertToCart = async (req, res) => {
                 cart_id: await dbase.autoIncrement('cart'),
                 fk_customer: user.data.id,
                 fk_product: product_id,
-                cart_product_qty: qty
+                cart_product_qty: qty,
+                cart_is_buying: 0
             });
 
             newCart
@@ -107,7 +108,9 @@ exports.insertToCart = async (req, res) => {
 
 exports.getByCustomerId = async (req, res) => {
     const user = req.jwtDecoded;
+    const isBuying = req.query
 
+    let data = []
     const cart = await CART.aggregate([
         { $match: { fk_customer: user.data.id } },
         { $sort: { cart_id: -1 } },
@@ -123,14 +126,23 @@ exports.getByCustomerId = async (req, res) => {
         { $unwind: '$productInfo' }
     ]);
     if (cart) {
+        if (parseInt(isBuying) === 1) {
+            cart.forEach(item => {
+                if (item['cart_is_buying'] === 1) {
+                    data.push(item)
+                }
+            });
+        } else {
+            data = cart
+        }
         let total = 0;
-        cart.forEach(item => {
+        data.forEach(item => {
             item['total'] = item['productInfo']['product_paid_price'] * item['cart_product_qty']
             total += (item['productInfo']['product_paid_price'] * item['cart_product_qty'])
         });
         return res.status(200).json({
-            cart: cart,
-            count: cart.length,
+            cart: data,
+            count: data.length,
             total: total
         });
     } else return res.status(200).json({ message: "Giỏ hàng trống!" })
@@ -224,6 +236,52 @@ exports.deletecart = async (req, res) => {
     } else {
         return res.status(200).json({
             message: "Xóa giỏ hàng thành công",
+            arrFail: arrFail
+        })
+    }
+}
+
+exports.updateToBuying = async (req, res) => {
+    const data = req.body.data;
+    const user = req.jwtDecoded;
+    console.log(req.body)
+
+    if (!data) {
+        return res.status(400).json({ message: "Không có thông tin sản phẩm" });
+    }
+    let arrFail = [];
+    data.forEach(async item => {
+        const cart = await CART.aggregate([
+            {
+                $match:
+                {
+                    $and:
+                        [
+                            { fk_customer: user.data.id },
+                            { cart_id: item.cart_id }
+                        ]
+                }
+            }
+        ])
+        if (cart) {
+            try {
+                await CART.updateOne(
+                    { cart_id: item.cart_id },
+                    { $set: { cart_is_buying: 1 } }
+                );
+            } catch (error) {
+                arrFail.push(item.cart_id)
+            }
+        } else {
+            arrFail.push(item.cart_id);
+        }
+    });
+
+    if (data.length == arrFail.length) {
+        return res.status(400).json({ message: "Thất bại!" })
+    } else {
+        return res.status(200).json({
+            message: "Thành công",
             arrFail: arrFail
         })
     }

@@ -17,31 +17,31 @@ var extraData = "merchantName=;merchantId=" //pass empty value if your merchant 
 
 //before sign HMAC SHA256 with format
 //partnerCode=$partnerCode&accessKey=$accessKey&requestId=$requestId&amount=$amount&orderId=$oderId&orderInfo=$orderInfo&returnUrl=$returnUrl&notifyUrl=$notifyUrl&extraData=$extraData
-var rawSignature = "partnerCode="+partnerCode+"&accessKey="+accessKey+"&requestId="+requestId+"&amount="+amount+"&orderId="+orderId+"&orderInfo="+orderInfo+"&returnUrl="+returnUrl+"&notifyUrl="+notifyurl+"&extraData="+extraData
+var rawSignature = "partnerCode=" + partnerCode + "&accessKey=" + accessKey + "&requestId=" + requestId + "&amount=" + amount + "&orderId=" + orderId + "&orderInfo=" + orderInfo + "&returnUrl=" + returnUrl + "&notifyUrl=" + notifyurl + "&extraData=" + extraData
 //puts raw signature
 console.log("--------------------RAW SIGNATURE----------------")
 console.log(rawSignature)
 //signature
 const crypto = require('crypto');
 var signature = crypto.createHmac('sha256', serectkey)
-                   .update(rawSignature)
-                   .digest('hex');
+  .update(rawSignature)
+  .digest('hex');
 console.log("--------------------SIGNATURE----------------")
 console.log(signature)
 
 //json object send to MoMo endpoint
 var body = JSON.stringify({
-    partnerCode : partnerCode,
-    accessKey : accessKey,
-    requestId : requestId,
-    amount : amount,
-    orderId : orderId,
-    orderInfo : orderInfo,
-    returnUrl : returnUrl,
-    notifyUrl : notifyurl,
-    extraData : extraData,
-    requestType : requestType,
-    signature : signature,
+  partnerCode: partnerCode,
+  accessKey: accessKey,
+  requestId: requestId,
+  amount: amount,
+  orderId: orderId,
+  orderInfo: orderInfo,
+  returnUrl: returnUrl,
+  notifyUrl: notifyurl,
+  extraData: extraData,
+  requestType: requestType,
+  signature: signature,
 })
 //Create the HTTPS objects
 var options = {
@@ -52,7 +52,7 @@ var options = {
   headers: {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body)
- }
+  }
 };
 
 //Send the request and get the response
@@ -63,11 +63,11 @@ var req = https.request(options, (res) => {
   res.setEncoding('utf8');
   console.log('BODY')
   res.on('data', (body) => {
-      let rs = JSON.parse(body)
+    let rs = JSON.parse(body)
     console.log(rs.errorCode);
   });
   res.on('end', () => {
-    console.log('No more data in response.');
+    console.log('No more data in response.');.
   });
 });
 
@@ -77,4 +77,5 @@ req.on('error', (e) => {
 
 // write data to request body
 req.write(body);
+console.log('data', body)
 req.end();

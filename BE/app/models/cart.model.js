@@ -3,7 +3,8 @@ module.exports = mongoose => {
         cart_id: Number,
         fk_customer: Number,
         fk_product: Number,
-        cart_product_qty: Number
+        cart_product_qty: Number,
+        cart_is_buying: Number,
     }, { timestamps: false });
 
     schema.method("toJSON", function() {

@@ -11,16 +11,17 @@ const paginateInfo = require('paginate-info');
 const https = require('https');
 const tree = require("../libs/tree.json");
 const { nextTick } = require("process");
+const { json } = require("body-parser");
 
 const debug = console.log.bind(console);
 
 dbase.mongoose = mongoose;
 
-const partnerCodeReq = "MOMOPVSI20201203";
-const accessKeyReq = "CgPSueK0mhvJaOkx";
+const partnerCodeReq = "MOMO";
+const accessKeyReq = "F8BBA842ECF85";
 const requestType = "captureMoMoWallet";
-const secretKey = "1e9JBSSU6Om2nvIds7EI3w4uiawh5fML";
-const orderInfoReq = "H2 team";
+const secretKey = "K951B6PE1waDMi640xX08PD3vg6EkVlz";
+const orderInfoReq = "H2team";
 const returnUrl = "http://192.168.0.103:4200";
 const notifyUrl = "https://kltn-be.herokuapp.com/order/confirm-payment";
 const extraData = "qrpay";
@@ -29,14 +30,14 @@ exports.insertSaleOrder = async (req, res) => {
     const user = req.jwtDecoded;
     const { data, customerInfo, paymentType } = req.body;
 
-    if (!data){
+    if (!data) {
         return res.status(500).json("Content can not be empty!");
     }
     let payType = 1;
-    if(paymentType !== "cod" ){
+    if (paymentType !== "cod") {
         payType = 0;
     }
-    
+
     let orderDeatailId = []
     let message = [];
     let amount = 0;
@@ -44,15 +45,15 @@ exports.insertSaleOrder = async (req, res) => {
     let address = ''
 
     await Object.values(tree).map((item) => {
-        if(item.code == customerInfo.customer_province){
+        if (item.code == customerInfo.customer_province) {
             address = item.name_with_type
             const dis = item.district;
             Object.values(dis).map((dist) => {
-                if(customerInfo.customer_district === dist.code){
+                if (customerInfo.customer_district === dist.code) {
                     address = address + ', ' + dist.name_with_type
                     const ward1 = dist.ward
                     Object.values(ward1).map((wardItem) => {
-                        if(customerInfo.customer_ward === wardItem.code){
+                        if (customerInfo.customer_ward === wardItem.code) {
                             address = address + ', ' + wardItem.name_with_type
                         }
                     });
@@ -68,9 +69,9 @@ exports.insertSaleOrder = async (req, res) => {
         order_customer_name: customerInfo.customer_fullName,
         order_customer_phone: customerInfo.customer_fullName,
         order_customer_address: address,
-        order_status: 1,
-        order_is_cod: payType, 
-        order_qr_url:''
+        order_status_fk: 1,
+        order_is_cod: payType,
+        order_qr_url: ''
     });
 
     await order
@@ -78,99 +79,94 @@ exports.insertSaleOrder = async (req, res) => {
         .then(result => {
         })
         .catch(err => {
-            return res.status(500).json({message: "Không thể tạo đơn hàng!"});
+            return res.status(500).json({ message: "Không thể tạo đơn hàng!" });
         });
 
-    for(let i = 0; i < data.length; i++){
+    for (let i = 0; i < data.length; i++) {
         const productId = data[i].fk_product;
 
-        await PRODUCT.findOne({product_id: productId})
-        .then(async productInfo => {
-            if(productInfo['product_qty'] < data[i].cart_product_qty){
-                const mess = 'Sản phẩm ' + productInfo['product_name'] + ' không đủ số lượng trong kho';
-                message.push(mess);
-            }
+        await PRODUCT.findOne({ product_id: productId })
+            .then(async productInfo => {
+                if (productInfo['product_qty'] < data[i].cart_product_qty) {
+                    const mess = 'Sản phẩm ' + productInfo['product_name'] + ' không đủ số lượng trong kho';
+                    message.push(mess);
+                }
 
-            const productPrice = productInfo['product_unit_price'];
-            let newPrice = productInfo['product_paid_price'];
-            // let voucherId = null;
-            
-            // if(product.voucher){
-            //     const voucherInfo = VOUCHER.findOne({voucher_code: product.voucher});
-            //     const today = new Date();
-            //     if(voucherInfo && voucherInfo['voucher_available_at'] <= today 
-            //     && voucherInfo['voucher_expired_at'] >= today 
-            //     && voucherInfo['voucher_status'] == true 
-            //     && (voucherInfo['voucher_qty'] == 0 || voucherInfo['voucher_remaining'] > 0)){
-            //         newPrice = newPrice * voucherInfo['voucher_value'] / 100;
-            //         voucherId = voucherInfo['voucher_id'];
-            //     }
-            // }
-            const detailId = await dbase.autoIncrement('orderDetail')
+                const productPrice = productInfo['product_unit_price'];
+                let newPrice = productInfo['product_paid_price'];
+                // let voucherId = null;
 
-            const orderDeatail = new ORDERDETAIL({
-                order_detail_id: detailId,
-                order_fk: orderId,
-                product_fk: productId,
-                order_detail_unit_price: productPrice,
-                order_detail_paid_price: newPrice,
-                order_detail_qty: data[i].cart_product_qty,
-                order_detail_voucher: null
-            })
+                // if(product.voucher){
+                //     const voucherInfo = VOUCHER.findOne({voucher_code: product.voucher});
+                //     const today = new Date();
+                //     if(voucherInfo && voucherInfo['voucher_available_at'] <= today 
+                //     && voucherInfo['voucher_expired_at'] >= today 
+                //     && voucherInfo['voucher_status'] == true 
+                //     && (voucherInfo['voucher_qty'] == 0 || voucherInfo['voucher_remaining'] > 0)){
+                //         newPrice = newPrice * voucherInfo['voucher_value'] / 100;
+                //         voucherId = voucherInfo['voucher_id'];
+                //     }
+                // }
+                const detailId = await dbase.autoIncrement('orderDetail')
 
-            await orderDeatail
-                .save(orderDeatail)
-                .then(async result => {
-                    orderDeatailId.push(detailId);
-                    const remaining = productInfo['product_qty'] - data[i].cart_product_qty;
-                    amount += data[i].total;
-
-                    await PRODUCT.updateOne(
-                        { product_id: productInfo['product_id'] },
-                        { $set: { product_qty: remaining } }
-                    )
-                    
-                    let cartId = data[i].cart_id;
-                    // await CART.deleteOne({ cart_id: cartId})
+                const orderDeatail = new ORDERDETAIL({
+                    order_detail_id: detailId,
+                    order_fk: orderId,
+                    product_fk: productId,
+                    order_detail_unit_price: productPrice,
+                    order_detail_paid_price: newPrice,
+                    order_detail_qty: data[i].cart_product_qty,
+                    order_detail_voucher: null
                 })
-                .catch(err => {
-                    message.push(err);
-                });
-        })
-        .catch(err => {
-            message.push(err);
-        });
+
+                await orderDeatail
+                    .save(orderDeatail)
+                    .then(async result => {
+                        orderDeatailId.push(detailId);
+                        const remaining = productInfo['product_qty'] - data[i].cart_product_qty;
+                        amount += data[i].total;
+
+                        await PRODUCT.updateOne(
+                            { product_id: productInfo['product_id'] },
+                            { $set: { product_qty: remaining } }
+                        )
+
+                        let cartId = data[i].cart_id;
+                        await CART.deleteOne({ cart_id: cartId})
+                    })
+                    .catch(err => {
+                        message.push(err);
+                    });
+            })
+            .catch(err => {
+                message.push(err);
+            });
     };
 
     let status = 200;
     let qrCodeUrl = '';
     let urlPayMo = '';
-    const code = '537282828992'
-    if(!message[0]){
-        if(paymentType === "momo"){
-            console.log('amount: ', amount.toString())
-            console.log('accesskey: ', accessKeyReq)
+    if (!message[0]) {
+        if (paymentType === "momo") {
             const rawSign = "partnerCode=" + partnerCodeReq
-                        + "&accessKey=" + accessKeyReq
-                        + "&requestId=" + code
-                        + "&amount=" + amount.toString()
-                        + "&orderId=" + code
-                        + "&orderInfo=" + orderInfoReq
-                        + "&returnUrl=" + returnUrl
-                        + "&notifyUrl=" + notifyUrl
-                        + "&extraData=" + extraData;
-            console.log(rawSign)
+                + "&accessKey=" + accessKeyReq
+                + "&requestId=" + orderId.toString()
+                + "&amount=" + amount.toString()
+                + "&orderId=" + orderId.toString()
+                + "&orderInfo=" + orderInfoReq
+                + "&returnUrl=" + returnUrl
+                + "&notifyUrl=" + notifyUrl
+                + "&extraData=" + extraData;
             const crypto = require('crypto');
             const signature = crypto.createHmac('sha256', secretKey)
-                                    .update(rawSign)
-                                    .digest('hex');
-            console.log(signature)
+                .update(rawSign)
+                .digest('hex');
             const data = JSON.stringify({
                 partnerCode: partnerCodeReq,
                 accessKey: accessKeyReq,
-                requestId: code,
+                requestId: orderId.toString(),
                 amount: amount.toString(),
-                orderId: code,
+                orderId: orderId.toString(),
                 orderInfo: orderInfoReq,
                 returnUrl: returnUrl,
                 notifyUrl: notifyUrl,
@@ -185,19 +181,84 @@ exports.insertSaleOrder = async (req, res) => {
                 path: '/gw_payment/transactionProcessor',
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json',
-                  'Content-Length': Buffer.byteLength(data)
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(data)
                 }
             };
-            let result;
+
+            let result = '';
             let status;
-            let req = await https.request(options, (response) => {
+            let req = https.request(options, async (response) => {
                 status = response.statusCode
                 response.setEncoding('utf8');
-                response.on('data', (body) => {
-                    console.log(body)
-                    result = JSON.parse(body)
+
+                response.on('data', async (body) => {
+                    result = result + body
                 })
+
+                response.on('end', async () => {
+                    result = JSON.parse(result)
+                    let errMo = false
+                    if (status !== 200
+                        || result.errorCode !== 0
+                        || orderId !== parseInt(result.requestId)
+                        || orderId !== parseInt(result.orderId)
+                        || result.requestType !== requestType) {
+                        errMo = true
+                    } else {
+                        const rawSignRes = "requestId=" + result.requestId
+                            + "&orderId=" + result.orderId
+                            + "&message=" + result.message
+                            + "&localMessage=" + result.localMessage
+                            + "&payUrl=" + result.payUrl
+                            + "&errorCode=" + result.errorCode
+                            + "&requestType=" + result.requestType;
+                        const signatureRes = crypto.createHmac('sha256', secretKey)
+                            .update(rawSignRes)
+                            .digest('hex');
+                        if (signatureRes !== result.signature) {
+                            errMo = true
+                        } else {
+                            message.push('Đặt hàng thành công');
+                            status = 200;
+                            qrCodeUrl = result.qrCodeUrl
+                            urlPayMo = result.payUrl
+
+                            await ORDER.updateOne(
+                                { order_id: orderId },
+                                { $set: { order_qr_url: qrCodeUrl } }
+                            )
+                        }
+                    }
+                    if (errMo) {
+                        message.push('Đặt hàng thất bại!');
+                        status = 500;
+
+                        await ORDER.updateOne(
+                            { order_id: orderId },
+                            {
+                                $set:
+                                {
+                                    $and:
+                                        [
+                                            { order_payment_fail_at: new Date() },
+                                            { order_status_fk: 4 }
+                                        ]
+                                }
+                            }
+                        )
+                    } else {
+                        status = 500;
+                    }
+                    return res.status(200).json({
+                        status: status,
+                        orderId: orderId,
+                        orderDetail: orderDeatailId,
+                        qrCodeUrl: qrCodeUrl || '',
+                        urlPayMo: urlPayMo || '',
+                        message: message
+                    })
+                });
             });
 
             req.on('error', (e) => {
@@ -205,134 +266,86 @@ exports.insertSaleOrder = async (req, res) => {
             });
             req.write(data);
             req.end();
-
-            let errMo = false 
-            if(status !== 200 
-                || result.errorCode !== 0 
-                || orderId !== result.requestId 
-                || orderId !== result.orderId 
-                || result.requestType !== requestType){
-                errMo = true
-            } else {
-                const rawSignRes = "requestId=" + result.requestId
-                                 + "&orderId=" + result.orderId
-                                 + "&message=" + result.message
-                                 + "&localMessage=" + result.localMessage
-                                 + "&payUrl=" + result.payUrl
-                                 + "&errorCode=" + result.errorCode
-                                 + "&requestType=" + result.requestType;
-                const signatureRes = crypto.createHmac('sha256', secretKey)
-                                           .update(rawSignRes)
-                                           .digest('hex');
-
-                if(signatureRes !== result.signature){
-                    errMo = true
-                } else {
-                    message.push('Đặt hàng thành công');
-                    status = 200;
-                    qrCodeUrl = result.qrCodeUrl
-                    urlPayMo = result.payUrl
-
-                    await ORDER.updateOne(
-                        { order_id: orderId },
-                        { $set: { order_qr_url: qrCodeUrl } }
-                    )
-                }
-            }
-
-            if(errMo){
-                message.push('Đặt hàng thất bại!');
-                status = 500;
-
-                await ORDER.updateOne(
-                    { order_id: orderId },
-                    { 
-                        $set: 
-                        {
-                            $and: 
-                                [
-                                    { order_payment_fail_at: new Date()},
-                                    { order_status_fk: 4 }
-                                ]
-                        }   
-                    }
-                )
-            } else {
-                status = 500;
-            }
         }
     } else {
         message.push("Đặt hàng thành công!")
+        return res.status(200).json({
+            status: status,
+            orderId: orderId,
+            orderDetail: orderDeatailId,
+            qrCodeUrl: qrCodeUrl || '',
+            urlPayMo: urlPayMo || '',
+            message: message
+        })
     }
-
-    return res.status(200).json({
-        status: status,
-        orderId: orderId,
-        orderDetail: orderDeatailId,
-        qrCodeUrl: qrCodeUrl || '',
-        urlPayMo: urlPayMo || '',
-        message: message
-    })
+    // return res.status(200).json({
+    //     status: status,
+    //     orderId: orderId,
+    //     orderDetail: orderDeatailId,
+    //     qrCodeUrl: qrCodeUrl || '',
+    //     urlPayMo: urlPayMo || '',
+    //     message: message
+    // })
 };
 
-exports.confirmPaymentMomo = async(req, res) => {
+exports.confirmPaymentMomo = async (req, res) => {
     const { partnerCode, accessKey, requestId, amount, orderId, orderInfo, orderType, transId, errorCode, message, localMessage, payType, responseTime, extraData, signature } = req.body;
 
     let code = 0;
     let messageRes = '';
-    if(partnerCode !== partnerCodeReq || accessKey !== accessKeyReq || orderInfo !== orderInfoReq){
+    if (partnerCode !== partnerCodeReq || accessKey !== accessKeyReq || orderInfo !== orderInfoReq) {
         code = 58;
         messageRes = 'Sai thông tin cửa hàng!';
     } else {
         const rawSign = "partnerCode=" + partnerCode
-                      + "&accessKey=" + accessKey
-                      + "&requestId=" + requestId
-                      + "&amount=" + amount
-                      + "&orderId=" + orderId
-                      + "&orderInfo=" + orderInfo
-                      + "&orderType=" + orderType
-                      + "&transId=" + transId
-                      + "&message=" + message
-                      + "&localMessage=" + localMessage
-                      + "&responseTime=" + responseTime
-                      + "&errorCode=" + errorCode
-                      + "&payType=" + payType
-                      + "&extraData=" + extraData;
+            + "&accessKey=" + accessKey
+            + "&requestId=" + requestId
+            + "&amount=" + amount
+            + "&orderId=" + orderId
+            + "&orderInfo=" + orderInfo
+            + "&orderType=" + orderType
+            + "&transId=" + transId
+            + "&message=" + message
+            + "&localMessage=" + localMessage
+            + "&responseTime=" + responseTime
+            + "&errorCode=" + errorCode
+            + "&payType=" + payType
+            + "&extraData=" + extraData;
 
         const sign = crypto.createHmac('sha256', secretKey)
-                           .update(rawSign)
-                           .digest('hex');
-        
-        if(sign !== signature){
+            .update(rawSign)
+            .digest('hex');
+
+        if (sign !== signature) {
             code = 5;
             messageRes = 'Sai thông tin chữ kí!';
         } else {
-            const order = await ORDER.findOne({ order_id: orderId});
-            if(!order){
+            const order = await ORDER.findOne({ order_id: orderId });
+            if (!order) {
                 code = 2
                 messageRes = 'Đơn hàng không tồn tại!';
             } else {
                 const detail = await ORDERDETAIL.aggregate([
-                    { $match: { order_fk: orderId }}
+                    { $match: { order_fk: orderId } }
                 ]);
-                if(errorCode === -1 || errorCode === 7){
+                if (errorCode === -1 || errorCode === 7) {
                     code = 0;
                     messageRes = 'Giao dịch đang xử lý!';
                     next();
-                } else if (errorCode !== 0 || errorCode !== 34){
+                } else if (errorCode !== 0 || errorCode !== 34) {
                     code = 99;
                     messageRes = 'Giao dịch không thành công!';
                     await ORDER.updateOne(
                         { order_id: orderId },
-                        { 
+                        {
                             $set:
                             {
-                                $and: 
-                                [
-                                    { order_payment_fail_at: new Date() },
-                                    { order_status_fk: 4 },
-                                    { order_qr_url: '' }
-                                ]
+                                $and:
+                                    [
+                                        { order_payment_fail_at: new Date() },
+                                        { order_status_fk: 4 },
+                                        { order_qr_url: '' }
+                                    ]
                             }
                         }
                     )
@@ -352,8 +365,8 @@ exports.confirmPaymentMomo = async(req, res) => {
                     detail.forEach(item => {
                         total += item['order_detail_paid_price'] * item['order_detail_qty']
                     });
-                    
-                    if(total !== amount || orderType != 'momo_wallet'){
+
+                    if (total !== amount || orderType != 'momo_wallet') {
                         code = 59;
                         messageRes = 'Thông tin đơn hàng hoặc giao dịch không đúng!';
                     } else {
@@ -361,15 +374,15 @@ exports.confirmPaymentMomo = async(req, res) => {
                         messageRes = 'Thành công'
                         await ORDER.updateOne(
                             { order_id: orderId },
-                            { 
+                            {
                                 $set:
                                 {
-                                    $and: 
-                                    [
-                                        { order_payment_success_at: new Date() },
-                                        { order_status_fk: 3 },
-                                        { order_qr_url: '' }
-                                    ]
+                                    $and:
+                                        [
+                                            { order_payment_success_at: new Date() },
+                                            { order_status_fk: 3 },
+                                            { order_qr_url: '' }
+                                        ]
                                 }
                             }
                         )
@@ -379,26 +392,26 @@ exports.confirmPaymentMomo = async(req, res) => {
         }
     }
     const time = new Date()
-    const resTime = time.getFullYear() + '-' 
-                  + time.getMonth() + '-' 
-                  + time.getDate() + ' ' 
-                  + time.getHours() + ':' 
-                  + time.getMinutes() + ':' 
-                  + time.getSeconds();
+    const resTime = time.getFullYear() + '-'
+        + time.getMonth() + '-'
+        + time.getDate() + ' '
+        + time.getHours() + ':'
+        + time.getMinutes() + ':'
+        + time.getSeconds();
 
     const rawSignRes = "partnerCode=" + partnerCode
-                  + "&accessKey=" + accessKey
-                  + "&requestId=" + requestId
-                  + "&orderId=" + orderId
-                  + "&errorCode=" + code
-                  + "&message=" + messageRes
-                  + "&responseTime=" + resTime
-                  + "&extraData=confirm";
+        + "&accessKey=" + accessKey
+        + "&requestId=" + requestId
+        + "&orderId=" + orderId
+        + "&errorCode=" + code
+        + "&message=" + messageRes
+        + "&responseTime=" + resTime
+        + "&extraData=confirm";
 
     const signatureRes = crypto.createHmac('sha256', secretKey)
-                    .update(rawSignRes)
-                    .digest('hex');
-    
+        .update(rawSignRes)
+        .digest('hex');
+
     return res.status(200).json({
         partnerCode: partnerCode,
         accessKey: accessKey,
@@ -416,10 +429,10 @@ exports.getAll = async (req, res) => {
     const { search, currentPage, sort } = req.query;
 
     let orderBy = -1;
-    if(sort && sort === 'asc'){
+    if (sort && sort === 'asc') {
         orderBy = 1;
     }
-    
+
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const order = await ORDER.aggregate([
         { $match: search ? { $text: { $search: search } } : {} },
@@ -433,7 +446,7 @@ exports.getAll = async (req, res) => {
                 as: 'customer'
             }
         },
-        { $unwind: '$customer'},
+        { $unwind: '$customer' },
         {
             $lookup:
             {
@@ -443,7 +456,7 @@ exports.getAll = async (req, res) => {
                 as: 'order_status'
             }
         },
-        { $unwind: '$order_status'},
+        { $unwind: '$order_status' },
         {
             $lookup:
             {
@@ -456,8 +469,8 @@ exports.getAll = async (req, res) => {
         {
             $project: {
                 _id: 0,
-                order_id: 1, 
-                order_customer_name: 1, 
+                order_id: 1,
+                order_customer_name: 1,
                 order_customer_phone: 1,
                 order_customer_address: 1,
                 order_status: 1,
@@ -467,10 +480,12 @@ exports.getAll = async (req, res) => {
             }
         }
     ]).then(async (data) => {
+        console.log(data.length)
         await data.forEach(order => {
             // const date = order['createdAt'];
             // order['createdAt'] = date.getFullYear() + date.getMonth() + date.getDate();
             order['order_status'] = order['order_status']['order_status_title'];
+            // order['order_status_vn'] = order['order_status']['order_status_title_vn'];
             let total = 0;
             order['order_detail'].forEach(detail => {
                 total += (detail['order_detail_paid_price'] * detail['order_detail_qty']);
@@ -489,7 +504,7 @@ exports.getAll = async (req, res) => {
             status: 'Success',
             data: pagData,
             meta: pagInfo,
-            countPage: Math.ceil(count/10)
+            countPage: Math.ceil(count / 10)
         });
     }
     ).catch(async (err) => {
@@ -499,15 +514,15 @@ exports.getAll = async (req, res) => {
     });
 };
 
-exports.getByCustomer = async(req, res) =>{
+exports.getByCustomer = async (req, res) => {
     const customer = req.jwtDecoded;
-    const {currentPage, status } = req.query;
+    const { currentPage, status } = req.query;
 
     let orderBy = -1;
-    
+
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const order = await ORDER.aggregate([
-        { $match: { $and: [ { customer_fk: customer.data.id}, status ? { order_status_fk: parseInt(status)} : {} ] } },
+        { $match: { $and: [{ customer_fk: customer.data.id }, status ? { order_status_fk: parseInt(status) } : {}] } },
         { $sort: { order_id: orderBy } },
         {
             $lookup:
@@ -518,7 +533,7 @@ exports.getByCustomer = async(req, res) =>{
                 as: 'order_status'
             }
         },
-        { $unwind: '$order_status'},
+        { $unwind: '$order_status' },
         {
             $lookup:
             {
@@ -529,12 +544,12 @@ exports.getByCustomer = async(req, res) =>{
             }
         }
     ]).then(async (data) => {
-        for(let i = 0; i < data.length; i++){
+        for (let i = 0; i < data.length; i++) {
             const detail = data[i]['order_detail'];
             let total = 0;
-            for(let j = 0; j < detail.length; j++) {
-                const productInfo = await PRODUCT.findOne({product_id: detail[j]['product_fk']})
-                if(productInfo){
+            for (let j = 0; j < detail.length; j++) {
+                const productInfo = await PRODUCT.findOne({ product_id: detail[j]['product_fk'] })
+                if (productInfo) {
                     detail[j]['productInfo'] = productInfo;
                 }
                 const sum = detail[j]['order_detail_paid_price'] * detail[j]['order_detail_qty'];
@@ -554,7 +569,7 @@ exports.getByCustomer = async(req, res) =>{
             status: 'Success',
             data: pagData,
             meta: pagInfo,
-            countPage: Math.ceil(count/10)
+            countPage: Math.ceil(count / 10)
         });
     }
     ).catch(async (err) => {
@@ -563,3 +578,5 @@ exports.getByCustomer = async(req, res) =>{
         });
     });
 }
+
+exports.changeOrderStatus

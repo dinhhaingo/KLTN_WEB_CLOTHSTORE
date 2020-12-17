@@ -244,7 +244,6 @@ exports.deletecart = async (req, res) => {
 exports.updateToBuying = async (req, res) => {
     const data = req.body.data;
     const user = req.jwtDecoded;
-    console.log(req.body)
 
     if (!data) {
         return res.status(400).json({ message: "Không có thông tin sản phẩm" });

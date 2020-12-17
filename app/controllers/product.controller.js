@@ -292,14 +292,14 @@ exports.getProductDiscount = async (req, res) => {
             }
         },
         { $unwind: '$product_size' }
-    ]).then(async (data) => {
-        data.forEach(async product => {
-            if (product['product_unit_price'] > product['product_paid_price'] && product['product_status'] === true) {
-                const date = product['createdAt'];
-                product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+    ]).then(async (product) => {
+        for(let i = 0; i < product.length; i++){
+            if (product[i]['product_unit_price'] > product[i]['product_paid_price'] && product[i]['product_status'] === true) {
+                const date = product[i]['createdAt'];
+                product[i]['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
 
-                const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
-                const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
+                const rating = await RATING.aggregate([{ $match: { fk_product: product[i]['product_id'] } }])
+                const comment = await COMMENT.aggregate([{ $match: { fk_product: product[i]['product_id'] } }])
 
                 let avgRating = 0;
                 let countRating = 0;
@@ -315,12 +315,12 @@ exports.getProductDiscount = async (req, res) => {
                 }
                 if (comment) countComment = comment.length
 
-                product['countComment'] = countComment;
-                product['countRating'] = countRating;
-                product['avgRating'] = avgRating;
-                prod.push(product);
+                product[i]['countComment'] = countComment;
+                product[i]['countRating'] = countRating;
+                product[i]['avgRating'] = avgRating;
+                prod.push(product[i]);
             }
-        });
+        };
 
         await res.status(200).json({
             status: 'Success',

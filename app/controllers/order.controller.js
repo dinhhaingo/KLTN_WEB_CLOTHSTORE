@@ -266,6 +266,14 @@ exports.insertSaleOrder = async (req, res) => {
             });
             req.write(data);
             req.end();
+        } else {
+            message.push("Đặt hàng thành công!")
+        return res.status(200).json({
+            status: status,
+            orderId: orderId,
+            orderDetail: orderDeatailId,
+            message: message
+        })
         }
     } else {
         message.push("Đặt hàng thành công!")
@@ -273,8 +281,6 @@ exports.insertSaleOrder = async (req, res) => {
             status: status,
             orderId: orderId,
             orderDetail: orderDeatailId,
-            qrCodeUrl: qrCodeUrl || '',
-            urlPayMo: urlPayMo || '',
             message: message
         })
     }
@@ -480,7 +486,6 @@ exports.getAll = async (req, res) => {
             }
         }
     ]).then(async (data) => {
-        console.log(data.length)
         await data.forEach(order => {
             // const date = order['createdAt'];
             // order['createdAt'] = date.getFullYear() + date.getMonth() + date.getDate();

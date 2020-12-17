@@ -285,6 +285,7 @@ exports.findAll = async (req, res) => {
 
 exports.login = async (req, res) => {
     const { username, password } = req.body;
+    console.log(req.body)
     const md5 = require('md5');
     if (!(username && password)) {
         return res.status(400).send({

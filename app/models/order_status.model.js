@@ -2,7 +2,8 @@ module.exports = mongoose => {
     var schema = mongoose.Schema(
       {
         order_status_id: Number,
-        order_status_title: String
+        order_status_title: String,
+        order_status_title_vn: String
       },
       { timestamps: false }
     );

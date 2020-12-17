@@ -244,12 +244,13 @@ exports.deletecart = async (req, res) => {
 exports.updateToBuying = async (req, res) => {
     const data = req.body.data;
     const user = req.jwtDecoded;
+    console.log(req.body)
 
     if (!data) {
         return res.status(400).json({ message: "Không có thông tin sản phẩm" });
     }
     let arrFail = [];
-    data.forEach(async id => {
+    data.forEach(async item => {
         const cart = await CART.aggregate([
             {
                 $match:
@@ -257,7 +258,7 @@ exports.updateToBuying = async (req, res) => {
                     $and:
                         [
                             { fk_customer: user.data.id },
-                            { cart_id: id }
+                            { cart_id: item.cart_id }
                         ]
                 }
             }
@@ -265,14 +266,14 @@ exports.updateToBuying = async (req, res) => {
         if (cart) {
             try {
                 await CART.updateOne(
-                    { cart_id: id },
+                    { cart_id: item.cart_id },
                     { $set: { cart_is_buying: 1 } }
                 );
             } catch (error) {
-                arrFail.push(id)
+                arrFail.push(item.cart_id)
             }
         } else {
-            arrFail.push(id);
+            arrFail.push(item.cart_id);
         }
     });
 

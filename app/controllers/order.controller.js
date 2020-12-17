@@ -69,7 +69,7 @@ exports.insertSaleOrder = async (req, res) => {
         order_customer_name: customerInfo.customer_fullName,
         order_customer_phone: customerInfo.customer_fullName,
         order_customer_address: address,
-        order_status: 1,
+        order_status_fk: 1,
         order_is_cod: payType,
         order_qr_url: ''
     });
@@ -132,7 +132,7 @@ exports.insertSaleOrder = async (req, res) => {
                         )
 
                         let cartId = data[i].cart_id;
-                        // await CART.deleteOne({ cart_id: cartId})
+                        await CART.deleteOne({ cart_id: cartId})
                     })
                     .catch(err => {
                         message.push(err);
@@ -146,7 +146,6 @@ exports.insertSaleOrder = async (req, res) => {
     let status = 200;
     let qrCodeUrl = '';
     let urlPayMo = '';
-    const code = '537282828992'
     if (!message[0]) {
         if (paymentType === "momo") {
             const rawSign = "partnerCode=" + partnerCodeReq
@@ -187,11 +186,10 @@ exports.insertSaleOrder = async (req, res) => {
                 }
             };
 
-            let result = ''
+            let result = '';
             let status;
             let req = https.request(options, async (response) => {
                 status = response.statusCode
-                console.log(status)
                 response.setEncoding('utf8');
 
                 response.on('data', async (body) => {
@@ -200,7 +198,6 @@ exports.insertSaleOrder = async (req, res) => {
 
                 response.on('end', async () => {
                     result = JSON.parse(result)
-                    console.log('result', result)
                     let errMo = false
                     if (status !== 200
                         || result.errorCode !== 0
@@ -222,7 +219,6 @@ exports.insertSaleOrder = async (req, res) => {
                         if (signatureRes !== result.signature) {
                             errMo = true
                         } else {
-                            console.log(result.qrCodeUrl)
                             message.push('Đặt hàng thành công');
                             status = 200;
                             qrCodeUrl = result.qrCodeUrl
@@ -282,6 +278,14 @@ exports.insertSaleOrder = async (req, res) => {
             message: message
         })
     }
+    // return res.status(200).json({
+    //     status: status,
+    //     orderId: orderId,
+    //     orderDetail: orderDeatailId,
+    //     qrCodeUrl: qrCodeUrl || '',
+    //     urlPayMo: urlPayMo || '',
+    //     message: message
+    // })
 };
 
 exports.confirmPaymentMomo = async (req, res) => {
@@ -476,10 +480,12 @@ exports.getAll = async (req, res) => {
             }
         }
     ]).then(async (data) => {
+        console.log(data.length)
         await data.forEach(order => {
             // const date = order['createdAt'];
             // order['createdAt'] = date.getFullYear() + date.getMonth() + date.getDate();
             order['order_status'] = order['order_status']['order_status_title'];
+            // order['order_status_vn'] = order['order_status']['order_status_title_vn'];
             let total = 0;
             order['order_detail'].forEach(detail => {
                 total += (detail['order_detail_paid_price'] * detail['order_detail_qty']);
@@ -572,3 +578,5 @@ exports.getByCustomer = async (req, res) => {
         });
     });
 }
+
+exports.changeOrderStatus

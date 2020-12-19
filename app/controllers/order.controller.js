@@ -67,7 +67,7 @@ exports.insertSaleOrder = async (req, res) => {
         order_id: orderId,
         customer_fk: user.data.id,
         order_customer_name: customerInfo.customer_fullName,
-        order_customer_phone: customerInfo.customer_fullName,
+        order_customer_phone: customerInfo.customer_phone,
         order_customer_address: address,
         order_status_fk: 1,
         order_is_cod: payType,

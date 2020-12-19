@@ -67,7 +67,7 @@ exports.insertSaleOrder = async (req, res) => {
         order_id: orderId,
         customer_fk: user.data.id,
         order_customer_name: customerInfo.customer_fullName,
-        order_customer_phone: customerInfo.customer_fullName,
+        order_customer_phone: customerInfo.customer_phone,
         order_customer_address: address,
         order_status_fk: 1,
         order_is_cod: payType,
@@ -266,6 +266,14 @@ exports.insertSaleOrder = async (req, res) => {
             });
             req.write(data);
             req.end();
+        } else {
+            message.push("Đặt hàng thành công!")
+        return res.status(200).json({
+            status: status,
+            orderId: orderId,
+            orderDetail: orderDeatailId,
+            message: message
+        })
         }
     } else {
         message.push("Đặt hàng thành công!")
@@ -273,8 +281,6 @@ exports.insertSaleOrder = async (req, res) => {
             status: status,
             orderId: orderId,
             orderDetail: orderDeatailId,
-            qrCodeUrl: qrCodeUrl || '',
-            urlPayMo: urlPayMo || '',
             message: message
         })
     }
@@ -480,7 +486,6 @@ exports.getAll = async (req, res) => {
             }
         }
     ]).then(async (data) => {
-        console.log(data.length)
         await data.forEach(order => {
             // const date = order['createdAt'];
             // order['createdAt'] = date.getFullYear() + date.getMonth() + date.getDate();

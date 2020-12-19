@@ -265,6 +265,10 @@ exports.findAll = async (req, res) => {
         { $match: search ? { $text: { $search: search } } : {} },
         { $sort: { customer_id: orderBy } },
     ]).then(async (data) => {
+        data.forEach(customer => {
+            const date = customer['customer_birthday'];
+            customer['customer_birthday'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        });
         const count = data.length;
         const pagData = data.slice(offset, offset + limit);
         const pagInfo = paginateInfo.paginate(currentPage, count, pagData);

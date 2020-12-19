@@ -9,6 +9,7 @@ const tree = require("../libs/tree.json");
 
 const constant = require('../constant/constant.js')
 const debug = console.log.bind(console);
+const moment = require('moment')
 
 let tokenList = {};
 
@@ -152,7 +153,7 @@ exports.updateProfile = async (req, res) => {
                 customer_fullName: customer_fullName || customerInfo['customer_fullName'],
                 customer_avatar: linkImage || customerInfo['customer_avatar'],
                 customer_gender: customer_gender || customerInfo['customer_gender'],
-                customer_birthday: customer_birthday || customerInfo['customer_birthday'],
+                customer_birthday: new Date(customer_birthday) || customerInfo['customer_birthday'],
                 customer_province: customer_province || customerInfo['customer_province'],
                 customer_district: customer_district || customerInfo['customer_district'],
                 customer_ward: customer_ward || customerInfo['customer_ward'],
@@ -160,37 +161,37 @@ exports.updateProfile = async (req, res) => {
             }
         }]
     )
-    .then(async data => {
-        const customer = await CUSTOMER.findOne({ customer_id: user.data.id })
-        if(customer){
-            res.status(200).send({ 
-                message: "Update thông tin thành công!!!",
-                data: customer
-            });
-        }
-    }).catch(err => {
-        res.status(200).send({ message: "Không thể update thông tin người dùng" });
-    });
+        .then(async data => {
+            const customer = await CUSTOMER.findOne({ customer_id: user.data.id })
+            if (customer) {
+                res.status(200).send({
+                    message: "Update thông tin thành công!!!",
+                    data: customer
+                });
+            }
+        }).catch(err => {
+            res.status(200).send({ message: "Không thể update thông tin người dùng" });
+        });
 };
 
 exports.changePassword = async (req, res) => {
     const user = req.jwtDecoded;
     const { customer_password, customer_newPass, customer_reNewPass } = req.body.data;
-    
+
     if (customer_newPass !== customer_reNewPass) {
         return res.status(400).json({ message: "Confirm Password không đúng!" });
     }
     const customerInfo = await CUSTOMER.findOne({ customer_id: user.data.id })
-    if(customerInfo){
-        if (customerInfo['customer_pass'] === md5(customer_password)){
-            if(customer_password === customer_newPass){
-                return res.status(500).json({message: "Trùng mật khẩu cũ, không thể đổi!"})
+    if (customerInfo) {
+        if (customerInfo['customer_pass'] === md5(customer_password)) {
+            if (customer_password === customer_newPass) {
+                return res.status(500).json({ message: "Trùng mật khẩu cũ, không thể đổi!" })
             }
             try {
                 await CUSTOMER.updateOne(
                     { customer_id: user.data.id },
                     {
-                        $set: 
+                        $set:
                         {
                             customer_pass: md5(customer_newPass)
                         }
@@ -204,13 +205,13 @@ exports.changePassword = async (req, res) => {
             return res.status(500).json({ message: "Mật khẩu không đúng" })
         }
     } else {
-        return res.status(500).json({message: "Không tìm thấy thông tin khách hàng!"})
+        return res.status(500).json({ message: "Không tìm thấy thông tin khách hàng!" })
     }
     customerInfo['customer_pass'] = md5(customer_newPass)
 
     return res.status(200).json({
         message: "Đổi mật khẩu thành công!",
-        data : customerInfo
+        data: customerInfo
     })
 }
 
@@ -261,13 +262,15 @@ exports.findAll = async (req, res) => {
     }
 
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
-    const customer = await CUSTOMER.aggregate([
+    await CUSTOMER.aggregate([
         { $match: search ? { $text: { $search: search } } : {} },
         { $sort: { customer_id: orderBy } },
     ]).then(async (data) => {
         data.forEach(customer => {
-            const date = customer['customer_birthday'];
-            customer['customer_birthday'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            if (customer.customer_birthday) {
+                const date = customer.customer_birthday;
+                customer.customer_birthday = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            }
         });
         const count = data.length;
         const pagData = data.slice(offset, offset + limit);

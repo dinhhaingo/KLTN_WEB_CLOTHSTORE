@@ -108,7 +108,7 @@ exports.insertToCart = async (req, res) => {
 
 exports.getByCustomerId = async (req, res) => {
     const user = req.jwtDecoded;
-    const isBuying = req.query
+    const isBuying = req.query.isBuying
 
     let data = []
     const cart = await CART.aggregate([
@@ -127,11 +127,11 @@ exports.getByCustomerId = async (req, res) => {
     ]);
     if (cart) {
         if (parseInt(isBuying) === 1) {
-            cart.forEach(item => {
-                if (item['cart_is_buying'] === 1) {
-                    data.push(item)
+            for (let i = 0; i < cart.length; i++) {
+                if (parseInt(cart[i]['cart_is_buying']) === 1) {
+                    data.push(cart[i])
                 }
-            });
+            }
         } else {
             data = cart
         }
@@ -249,32 +249,48 @@ exports.updateToBuying = async (req, res) => {
         return res.status(400).json({ message: "Không có thông tin sản phẩm" });
     }
     let arrFail = [];
-    data.forEach(async item => {
-        const cart = await CART.aggregate([
-            {
-                $match:
-                {
-                    $and:
-                        [
-                            { fk_customer: user.data.id },
-                            { cart_id: item.cart_id }
-                        ]
+    const fullCart = await CART.aggregate([{ $match: { fk_customer: user.data.id } }])
+
+    if (fullCart) {
+        if (fullCart.length == data.length) {
+            fullCart.forEach(async item => {
+                try {
+                    await CART.updateOne(
+                        { cart_id: item['cart_id'] },
+                        { $set: { cart_is_buying: 1 } }
+                    );
+                } catch (error) {
+                    arrFail.push(item['cart_id'])
+                }
+            });
+        } else {
+            for (let j = 0; j < data.length; j++) {
+                for (let i = 0; i < fullCart.length; i++) {
+                    if (fullCart[i]['cart_id'] === data[j].cart_id) {
+                        try {
+                            await CART.updateOne(
+                                { cart_id: data[j].cart_id },
+                                { $set: { cart_is_buying: 1 } }
+                            );
+                        } catch (error) {
+                            arrFail.push(data[j].cart_id)
+                        }
+                    } else {
+                        try {
+                            await CART.updateOne(
+                                { cart_id: fullCart[i]['cart_id'] },
+                                { $set: { cart_is_buying: 0 } }
+                            );
+                        } catch (error) {
+                            arrFail.push(error);
+                        }
+                    }
                 }
             }
-        ])
-        if (cart) {
-            try {
-                await CART.updateOne(
-                    { cart_id: item.cart_id },
-                    { $set: { cart_is_buying: 1 } }
-                );
-            } catch (error) {
-                arrFail.push(item.cart_id)
-            }
-        } else {
-            arrFail.push(item.cart_id);
         }
-    });
+    } else {
+        return res.status(500).json({ message: "Giỏ hàng trống!" })
+    }
 
     if (data.length == arrFail.length) {
         return res.status(400).json({ message: "Thất bại!" })

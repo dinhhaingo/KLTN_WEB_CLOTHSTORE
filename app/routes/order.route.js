@@ -5,7 +5,7 @@ const app = express();
 const authMiddleware = require('../middleware/AuthMiddleware');
 
 var corsOptions1 = {
-    origin: "http://192.168.0.103:4200",
+    origin: "http://192.168.0.101:4200",
     optionsSuccessStatus: 200
 };
 
@@ -25,6 +25,8 @@ module.exports = app => {
     router.get("/get-all", order.getAll);
 
     router.get("/get-by-customer", order.getByCustomer);
+
+    router.get("/get-by-id", order.getById);
 
     app.use('/order', router);
 };

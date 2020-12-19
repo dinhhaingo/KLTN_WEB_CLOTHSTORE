@@ -22,7 +22,7 @@ const accessKeyReq = "F8BBA842ECF85";
 const requestType = "captureMoMoWallet";
 const secretKey = "K951B6PE1waDMi640xX08PD3vg6EkVlz";
 const orderInfoReq = "H2team";
-const returnUrl = "http://192.168.0.103:4200";
+const returnUrl = "http://192.168.0.101:4200";
 const notifyUrl = "https://kltn-be.herokuapp.com/order/confirm-payment";
 const extraData = "qrpay";
 
@@ -575,6 +575,61 @@ exports.getByCustomer = async (req, res) => {
             data: pagData,
             meta: pagInfo,
             countPage: Math.ceil(count / 10)
+        });
+    }
+    ).catch(async (err) => {
+        await res.status(500).send({
+            message: err.message || "Some error occurred while retrieving tutorials."
+        });
+    });
+}
+
+exports.getById = async (req, res) => {
+    const customer = req.jwtDecoded;
+    const id = req.query.id;
+
+    const order = await ORDER.aggregate([
+        { $match: { $and: [{ customer_fk: customer.data.id }, { order_id: parseInt(id) }] } },
+        {
+            $lookup:
+            {
+                from: 'order_statuss',
+                localField: 'order_status_fk',
+                foreignField: 'order_status_id',
+                as: 'order_status'
+            }
+        },
+        { $unwind: '$order_status' },
+        {
+            $lookup:
+            {
+                from: 'order_details',
+                localField: 'order_id',
+                foreignField: 'order_fk',
+                as: 'order_detail'
+            }
+        }
+    ]).then(async (data) => {
+        for (let i = 0; i < data.length; i++) {
+            const detail = data[i]['order_detail'];
+            let total = 0;
+            for (let j = 0; j < detail.length; j++) {
+                const productInfo = await PRODUCT.findOne({ product_id: detail[j]['product_fk'] })
+                if (productInfo) {
+                    detail[j]['productInfo'] = productInfo;
+                }
+                const sum = detail[j]['order_detail_paid_price'] * detail[j]['order_detail_qty'];
+                detail[j]['total'] = sum;
+                total += sum;
+            };
+            data[i]['total'] = total;
+            data[i]['order_detail'] = detail;
+            const date = data[i]['createdAt'];
+            data[i]['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+        };
+        await res.status(200).json({
+            status: 'Success',
+            data: data
         });
     }
     ).catch(async (err) => {

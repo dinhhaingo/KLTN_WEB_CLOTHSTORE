@@ -13,7 +13,7 @@ const corsOptions1 = {
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions1));
+// app.use(cors(corsOptions1));
 
 module.exports = app => {
     const cart = require("../controllers/cart.controller.js");
@@ -22,15 +22,15 @@ module.exports = app => {
 
     router.use(authMiddleware.isAuth);
 
-    router.post("/insert-cart", cors(corsOptions1), cart.insertToCart);
+    router.post("/insert-cart", cart.insertToCart);
 
-    router.get("/get-by-customer", cors(corsOptions1), cart.getByCustomerId)
+    router.get("/get-by-customer", cart.getByCustomerId)
 
-    router.put("/update-qty", cors(corsOptions1), cart.updateQty)
+    router.put("/update-qty", cart.updateQty)
 
-    router.delete("/delete-cart", cors(corsOptions1), cart.deletecart);
+    router.delete("/delete-cart", cart.deletecart);
 
-    router.post("/update-to-buy", cors(corsOptions1), cart.updateToBuying);
+    router.post("/update-to-buy", cart.updateToBuying);
 
     app.use('/cart', router);
 };

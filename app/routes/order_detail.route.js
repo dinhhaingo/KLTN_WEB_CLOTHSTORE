@@ -9,7 +9,7 @@ var corsOptions1 = {
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions1));
+// app.use(cors(corsOptions1));
 
 module.exports = app => {
     const order = require("../controllers/order_detail.controller.js");

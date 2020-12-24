@@ -8,7 +8,7 @@ var corsOptions1 = {
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions1));
+// app.use(cors(corsOptions1));
 
 module.exports = app => {
     const province = require("../controllers/province.controller.js");
@@ -17,11 +17,11 @@ module.exports = app => {
 
     // router.post("/create", cors(corsOptions1), province.create);
 
-    router.get("/get-district", cors(corsOptions1), province.getDistrictByProvince);
+    router.get("/get-district", province.getDistrictByProvince);
 
-    router.get("/get-all", cors(corsOptions1), province.getAllProvince);
+    router.get("/get-all", province.getAllProvince);
 
-    router.get("/get-ward", cors(corsOptions1), province.getWardByDistrict);
+    router.get("/get-ward", province.getWardByDistrict);
 
     // router.put("/update-product", cors(corsOptions1), province.updateProduct);
 

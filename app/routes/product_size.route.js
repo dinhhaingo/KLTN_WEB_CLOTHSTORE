@@ -7,9 +7,9 @@ module.exports = app => {
 
     let router = require('express').Router();
 
-    router.get("/get-all", cors(), productSize.getAll);
+    router.get("/get-all", productSize.getAll);
 
-    router.get("/get-by-product-type", cors(), productSize.getByProductType);
+    router.get("/get-by-product-type", productSize.getByProductType);
 
     app.use('/product-size', router);
 }

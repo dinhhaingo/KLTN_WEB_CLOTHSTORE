@@ -561,6 +561,13 @@ exports.getByCustomer = async (req, res) => {
                 detail[j]['total'] = sum;
                 total += sum;
             };
+
+            // if(data[i]['order_status_fk'] == 1 || data[i]['order_status_fk'] == 2){
+            //     data[i]['isCancel'] = 1
+            // } else {
+            //     data[i]['isCancel'] = 0
+            // }
+
             data[i]['total'] = total;
             data[i]['order_detail'] = detail;
             const date = data[i]['createdAt'];
@@ -639,4 +646,35 @@ exports.getById = async (req, res) => {
     });
 }
 
-exports.changeOrderStatus
+exports.changeOrderStatus = async (req, res) => {
+    const customer = req.jwtDecoded;
+    // const { order,  }
+}
+
+exports.cancelOrder = async (req, res) => {
+    const customer = req.jwtDecoded;
+    const id = req.body.id
+    if(!id){
+        return res.status(500).json({message: "Thiếu thông tin!"});
+    }
+
+    const order = await ORDER.findOne({ order_id: id })
+
+    if (!order){
+        return res.status(500).json({message: "Không tìm thấy đơn hàng!"})
+    }
+
+    if(order['order_status_fk'] == 1 || order['order_status_fk'] == 2){
+        try {
+            await ORDER.updateOne(
+                { order_id: id },
+                { $set: { order_status_fk: 5 } }
+            );
+        } catch(error){
+            return res.status(500).json({message: 'Gặp lỗi khi hủy đơn hàng, thử lại sau!'})
+        }
+    } else {
+        return res.status(500).json({message: "Không thể hủy đơn hàng!"})
+    }
+    return res.status(200).json({message: 'Hủy đơn hàng thành công!'})
+}

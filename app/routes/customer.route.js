@@ -13,7 +13,7 @@ const corsOptions1 = {
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions1));
+// app.use(cors(corsOptions1));
 
 module.exports = app => {
     const customer = require("../controllers/customer.controller.js");
@@ -22,7 +22,7 @@ module.exports = app => {
 
     router.post("/create", customer.create);
 
-    router.post("/register", cors(corsOptions1), customer.register);
+    router.post("/register",  customer.register);
 
     router.post("/login", customer.login);
 
@@ -38,7 +38,7 @@ module.exports = app => {
 
     router.put("/change-password", customer.changePassword)
 
-    router.get("/find-all", cors(corsOptions1), customer.findAll);
+    router.get("/find-all",  customer.findAll);
 
     router.post("/refresh-token", customer.refreshToken);
 

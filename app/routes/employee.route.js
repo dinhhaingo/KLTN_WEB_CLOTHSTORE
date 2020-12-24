@@ -12,7 +12,7 @@ var corsOptions1 = {
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions1));
+// app.use(cors(corsOptions1));
 
 module.exports = app => {
     const employee = require("../controllers/employee.controller.js");
@@ -31,7 +31,7 @@ module.exports = app => {
 
     router.put("/update-image", employee.updateImage);
 
-    router.post("/login", cors(corsOptions1), employee.login);
+    router.post("/login", employee.login);
 
     router.post("/refresh-token", employee.refreshToken);
 

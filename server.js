@@ -14,7 +14,7 @@ var corsOptions1 = {
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions1));
+app.use(cors());
 
 const db = require("./app/models/index/index");
 db.mongoose

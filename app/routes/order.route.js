@@ -9,7 +9,7 @@ var corsOptions1 = {
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions1));
+// app.use(cors(corsOptions1));
 
 module.exports = app => {
     const order = require("../controllers/order.controller.js");
@@ -27,6 +27,8 @@ module.exports = app => {
     router.get("/get-by-customer", order.getByCustomer);
 
     router.get("/get-by-id", order.getById);
+
+    router.post('/cancel-order', order.cancelOrder);
 
     app.use('/order', router);
 };

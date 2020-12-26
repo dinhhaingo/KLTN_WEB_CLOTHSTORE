@@ -132,7 +132,7 @@ exports.insertSaleOrder = async (req, res) => {
                         )
 
                         let cartId = data[i].cart_id;
-                        await CART.deleteOne({ cart_id: cartId})
+                        await CART.deleteOne({ cart_id: cartId })
                     })
                     .catch(err => {
                         message.push(err);
@@ -268,12 +268,12 @@ exports.insertSaleOrder = async (req, res) => {
             req.end();
         } else {
             message.push("Đặt hàng thành công!")
-        return res.status(200).json({
-            status: status,
-            orderId: orderId,
-            orderDetail: orderDeatailId,
-            message: message
-        })
+            return res.status(200).json({
+                status: status,
+                orderId: orderId,
+                orderDetail: orderDeatailId,
+                message: message
+            })
         }
     } else {
         message.push("Đặt hàng thành công!")
@@ -647,34 +647,55 @@ exports.getById = async (req, res) => {
 }
 
 exports.changeOrderStatus = async (req, res) => {
-    const customer = req.jwtDecoded;
-    // const { order,  }
+    const user = req.jwtDecoded;
+    const { id, status } = req.body;
+
+    if (!req.body) {
+        return res.status(500).json({ message: "Thiếu thông tin!" });
+    }
+
+    const order = await ORDER.findOne({ order_id: id })
+
+    if (!order) {
+        return res.status(500).json({ message: "Không tìm thấy đơn hàng!" })
+    }
+
+    try {
+        await ORDER.updateOne(
+            { order_id: id },
+            { $set: { order_status_fk: parseInt(status) } }
+        );
+    } catch (error) {
+        return res.status(500).json({ message: 'Gặp lỗi khi sửa trạng thái, thử lại sau!' })
+    }
+
+    return res.status(200).json({ message: 'Sửa trạng thái đơn hàng thành công!' })
 }
 
 exports.cancelOrder = async (req, res) => {
     const customer = req.jwtDecoded;
     const id = req.body.id
-    if(!id){
-        return res.status(500).json({message: "Thiếu thông tin!"});
+    if (!id) {
+        return res.status(500).json({ message: "Thiếu thông tin!" });
     }
 
     const order = await ORDER.findOne({ order_id: id })
 
-    if (!order){
-        return res.status(500).json({message: "Không tìm thấy đơn hàng!"})
+    if (!order) {
+        return res.status(500).json({ message: "Không tìm thấy đơn hàng!" })
     }
 
-    if(order['order_status_fk'] == 1 || order['order_status_fk'] == 2){
+    if (order['order_status_fk'] == 1 || order['order_status_fk'] == 2) {
         try {
             await ORDER.updateOne(
                 { order_id: id },
                 { $set: { order_status_fk: 5 } }
             );
-        } catch(error){
-            return res.status(500).json({message: 'Gặp lỗi khi hủy đơn hàng, thử lại sau!'})
+        } catch (error) {
+            return res.status(500).json({ message: 'Gặp lỗi khi hủy đơn hàng, thử lại sau!' })
         }
     } else {
-        return res.status(500).json({message: "Không thể hủy đơn hàng!"})
+        return res.status(500).json({ message: "Không thể hủy đơn hàng!" })
     }
-    return res.status(200).json({message: 'Hủy đơn hàng thành công!'})
+    return res.status(200).json({ message: 'Hủy đơn hàng thành công!' })
 }

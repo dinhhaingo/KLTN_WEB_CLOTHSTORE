@@ -28,6 +28,8 @@ module.exports = app => {
 
     router.get("/get-by-id", order.getById);
 
+    router.post('/change-order-status', order.changeOrderStatus);
+
     router.post('/cancel-order', order.cancelOrder);
 
     app.use('/order', router);

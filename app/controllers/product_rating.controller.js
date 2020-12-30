@@ -101,7 +101,7 @@ exports.getByProductId = async(req, res) => {
         ]).then(data => {
             data.forEach(rate => {
                 const date = rate['createdAt'];
-                rate['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+                rate['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
             });
             return res.status(200).json({data: data})
         })

@@ -269,7 +269,7 @@ exports.findAll = async (req, res) => {
         data.forEach(customer => {
             if (customer.customer_birthday) {
                 const date = customer.customer_birthday;
-                customer.customer_birthday = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+                customer.customer_birthday = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
             }
         });
         const count = data.length;

@@ -399,7 +399,7 @@ exports.confirmPaymentMomo = async (req, res) => {
     }
     const time = new Date()
     const resTime = time.getFullYear() + '-'
-        + time.getMonth() + '-'
+        + (time.getMonth() + 1) + '-'
         + time.getDate() + ' '
         + time.getHours() + ':'
         + time.getMinutes() + ':'
@@ -497,9 +497,9 @@ exports.getAll = async (req, res) => {
             });
             order['total'] = total;
             const date = order['createdAt'];
-            order['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            order['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
             const update = order['updatedAt'];
-            order['updatedAt'] = update.getFullYear() + '-' + update.getMonth() + '-' + update.getDate();
+            order['updatedAt'] = update.getFullYear() + '-' + (update.getMonth() + 1) + '-' + update.getDate();
         });
         const count = data.length;
         const pagData = data.slice(offset, offset + limit);
@@ -571,7 +571,7 @@ exports.getByCustomer = async (req, res) => {
             data[i]['total'] = total;
             data[i]['order_detail'] = detail;
             const date = data[i]['createdAt'];
-            data[i]['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            data[i]['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
         };
         const count = data.length;
         const pagData = data.slice(offset, offset + limit);
@@ -632,7 +632,7 @@ exports.getById = async (req, res) => {
             data[i]['total'] = total;
             data[i]['order_detail'] = detail;
             const date = data[i]['createdAt'];
-            data[i]['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            data[i]['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
         };
         await res.status(200).json({
             status: 'Success',

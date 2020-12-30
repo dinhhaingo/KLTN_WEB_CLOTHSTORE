@@ -122,7 +122,7 @@ exports.getAll = async (req, res) => {
             product['countRating'] = countRating;
             product['avgRating'] = avgRating;
             const date = product['createdAt'];
-            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            product['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
         });
         const count = data.length;
         const pagData = data.slice(offset, offset + limit);
@@ -296,7 +296,7 @@ exports.getProductDiscount = async (req, res) => {
         for(let i = 0; i < product.length; i++){
             if (product[i]['product_unit_price'] > product[i]['product_paid_price'] && product[i]['product_status'] === true) {
                 const date = product[i]['createdAt'];
-                product[i]['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+                product[i]['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
 
                 const rating = await RATING.aggregate([{ $match: { fk_product: product[i]['product_id'] } }])
                 const comment = await COMMENT.aggregate([{ $match: { fk_product: product[i]['product_id'] } }])
@@ -389,7 +389,7 @@ exports.getProductRandom = async (req, res) => {
             product['countRating'] = countRating;
             product['avgRating'] = avgRating;
             const date = product['createdAt'];
-            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            product['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
         });
 
         await res.status(200).json({
@@ -471,7 +471,7 @@ exports.getAllClient = async (req, res) => {
             product['avgRating'] = avgRating;
 
             const date = product['createdAt'];
-            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            product['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
         });
         if (value) {
             data.forEach(product => {
@@ -558,7 +558,7 @@ exports.getProductHot = async (req, res) => {
         
         prod.forEach(async product => {
             const date = product['createdAt'];
-            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            product['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
 
             const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
             // const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
@@ -711,7 +711,7 @@ exports.getById = async (req, res) => {
             product['avgRating'] = avgRating;
 
             const date = product['createdAt'];
-            product['createdAt'] = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+            product['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
         });
 
         res.status(200).json({

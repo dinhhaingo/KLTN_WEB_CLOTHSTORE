@@ -48,7 +48,7 @@ app.get("/", (req, res) => {
 require("./app/routes/customer.route")(app);
 // require("./app/routes/district.route")(app);
 require("./app/routes/order_detail.route")(app);
-// require("./app/routes/order_status.route")(app);
+require("./app/routes/report.route")(app);
 require("./app/routes/order.route")(app);
 require("./app/routes/product.route")(app);
 require("./app/routes/employee.route")(app);

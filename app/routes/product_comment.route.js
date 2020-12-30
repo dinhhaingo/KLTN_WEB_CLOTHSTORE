@@ -13,18 +13,18 @@ const corsOptions1 = {
     optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions1));
+// app.use(cors(corsOptions1));
 
 module.exports = app => {
     const comment = require("../controllers/product_comment.controller.js");
 
     var router = require("express").Router();
 
-    router.get("/get-by-product", cors(corsOptions1), comment.getByProductId);
+    router.get("/get-by-product", comment.getByProductId);
 
     router.use(authMiddleware.isAuth);
 
-    router.post("/comment-by-customer", cors(corsOptions1), comment.commentByCustomer);
+    router.post("/comment-by-customer", comment.commentByCustomer);
 
     app.use('/comment', router);
 };

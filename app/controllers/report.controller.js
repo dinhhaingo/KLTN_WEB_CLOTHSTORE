@@ -54,7 +54,7 @@ exports.revenueYearly = async(req, res) => {
     for(let i = 0; i < 12;i ++){
         revenueLastYear[i] = {
             name: (i + 1),
-            value: 1000000
+            value: Math.floor(Math.random() * Math.floor(10000000))
         }
         revenueNo[i] = {
             name: (i + 1),

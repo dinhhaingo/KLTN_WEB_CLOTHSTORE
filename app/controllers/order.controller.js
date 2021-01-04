@@ -441,7 +441,6 @@ exports.getAll = async (req, res) => {
 
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const order = await ORDER.aggregate([
-        { $match: search ? { $text: { $search: search } } : {} },
         { $sort: { order_id: orderBy } },
         {
             $lookup:
@@ -486,6 +485,7 @@ exports.getAll = async (req, res) => {
             }
         }
     ]).then(async (data) => {
+        let result = []
         await data.forEach(order => {
             // const date = order['createdAt'];
             // order['createdAt'] = date.getFullYear() + date.getMonth() + date.getDate();
@@ -500,9 +500,17 @@ exports.getAll = async (req, res) => {
             order['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
             const update = order['updatedAt'];
             order['updatedAt'] = update.getFullYear() + '-' + (update.getMonth() + 1) + '-' + update.getDate();
+
+            if(search) { 
+                if (order['order_customer_name'].indexOf(search) != -1){
+                    result.push(order)
+                }
+            } else {
+                result.push(order)
+            }
         });
-        const count = data.length;
-        const pagData = data.slice(offset, offset + limit);
+        const count = result.length;
+        const pagData = result.slice(offset, offset + limit);
         const pagInfo = paginateInfo.paginate(currentPage, count, pagData);
 
         await res.status(200).json({

@@ -13,12 +13,10 @@ const debug = console.log.bind(console);
 dbase.mongoose = mongoose
 
 exports.getByOrderId = async (req, res) => {
-    const { order_id } = req.body
+    const id = req.query.id;
 
-    // const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const order = await ORDER.aggregate([
-        { $match: { order_id: order_id } },
-        { $sort: { order_id: -1 } },
+        { $match: { order_id: parseInt(id) } },
         {
             $lookup:
             {
@@ -28,9 +26,9 @@ exports.getByOrderId = async (req, res) => {
                 as: 'order_status'
             }
         },
-        { $unwind: '$order_status'},
+        { $unwind: '$order_status' },
         {
-            $lookup: 
+            $lookup:
             {
                 from: 'order_details',
                 localField: 'order_id',
@@ -39,15 +37,26 @@ exports.getByOrderId = async (req, res) => {
             }
         }
     ]).then(async (data) => {
-        const count = data.length;
-        // const pagData = data.slice(offset, offset + limit);
-        // const pagInfo = paginateInfo.paginate(currentPage, count, pagData);
-
+        for (let i = 0; i < data.length; i++) {
+            const detail = data[i]['order_detail'];
+            let total = 0;
+            for (let j = 0; j < detail.length; j++) {
+                const productInfo = await PRODUCT.findOne({ product_id: detail[j]['product_fk'] })
+                if (productInfo) {
+                    detail[j]['productInfo'] = productInfo;
+                }
+                const sum = detail[j]['order_detail_paid_price'] * detail[j]['order_detail_qty'];
+                detail[j]['total'] = sum;
+                total += sum;
+            };
+            data[i]['total'] = total;
+            data[i]['order_detail'] = detail;
+            const date = data[i]['createdAt'];
+            data[i]['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
+        };
         await res.status(200).json({
             status: 'Success',
-            data: data,
-            // meta: pagInfo,
-            // countPage: Math.ceil(count/10)
+            data: data
         });
     }
     ).catch(async (err) => {

@@ -185,7 +185,10 @@ exports.updateQty = async (req, res) => {
                     total = product['product_paid_price'] * qty
                     totalCart += total
                 } else {
-                    totalCart += (cart[i]['cart_product_qty'] * product['product_paid_price'])
+                    let pro = await PRODUCT.findOne({ product_id: cart[i]['fk_product'] })
+                    if(pro) {
+                        totalCart += (cart[i]['cart_product_qty'] * pro['product_paid_price'])
+                    }
                 }
             }
             return res.status(200).json({

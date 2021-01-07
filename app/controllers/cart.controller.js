@@ -2,6 +2,7 @@ const { query } = require("express");
 const dbase = require("../models/index");
 const CART = dbase.cart;
 const PRODUCT = dbase.product;
+const PRODUCTSIZE = dbase.productSize;
 const mongoose = require("mongoose");
 const jwtHelper = require('../helper/jwt.helper');
 
@@ -136,10 +137,15 @@ exports.getByCustomerId = async (req, res) => {
             data = cart
         }
         let total = 0;
-        data.forEach(item => {
-            item['total'] = item['productInfo']['product_paid_price'] * item['cart_product_qty']
-            total += (item['productInfo']['product_paid_price'] * item['cart_product_qty'])
-        });
+        for(let i = 0; i< data.length; i++) {
+            const size = await PRODUCTSIZE.findOne({ product_size_id: data[i]['productInfo']['product_size_fk'] })
+            if(size){
+                data[i]['productInfo']['size'] = size['product_size_title']
+            }
+
+            data[i]['total'] = data[i]['productInfo']['product_paid_price'] * data[i]['cart_product_qty']
+            total += (data[i]['productInfo']['product_paid_price'] * data[i]['cart_product_qty'])
+        };
         return res.status(200).json({
             cart: data,
             count: data.length,
@@ -173,7 +179,7 @@ exports.updateQty = async (req, res) => {
             for (let i = 0; i < cart.length; i++) {
                 if (cart[i]['fk_product'] == parseInt(product_id)) {
                     await CART.updateOne(
-                        { cart_id: cart[0]['cart_id'] },
+                        { cart_id: cart[i]['cart_id'] },
                         { $set: { cart_product_qty: qty } }
                     )
                     total = product['product_paid_price'] * qty

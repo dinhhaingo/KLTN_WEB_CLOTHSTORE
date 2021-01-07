@@ -2,6 +2,7 @@ const { query } = require("express");
 const dbase = require("../models/index");
 const ORDER = dbase.order;
 const PRODUCT = dbase.product;
+const PRODUCTSIZE = dbase.productSize;
 const VOUCHER = dbase.voucher;
 const ORDERDETAIL = dbase.orderDetail;
 const CART = dbase.cart;
@@ -535,7 +536,7 @@ exports.getByCustomer = async (req, res) => {
 
     const { limit, offset } = paginateInfo.calculateLimitAndOffset(currentPage, 10);
     const order = await ORDER.aggregate([
-        { $match: { $and: [{ customer_fk: customer.data.id }, status ? { order_status_fk: parseInt(status) } : {}] } },
+        { $match: { $and: [{ customer_fk: customer.data.id }, (status || parseInt(status) !== 0) ? { order_status_fk: parseInt(status) } : {}] } },
         { $sort: { order_id: orderBy } },
         {
             $lookup:
@@ -563,6 +564,11 @@ exports.getByCustomer = async (req, res) => {
             for (let j = 0; j < detail.length; j++) {
                 const productInfo = await PRODUCT.findOne({ product_id: detail[j]['product_fk'] })
                 if (productInfo) {
+                    let size = await PRODUCTSIZE.findOne({ product_size_id: productInfo['product_size_fk'] })
+                    if(size){
+                        productInfo['size'] = size['product_size_title']
+                    }
+
                     detail[j]['productInfo'] = productInfo;
                 }
                 const sum = detail[j]['order_detail_paid_price'] * detail[j]['order_detail_qty'];
@@ -629,8 +635,13 @@ exports.getById = async (req, res) => {
             const detail = data[i]['order_detail'];
             let total = 0;
             for (let j = 0; j < detail.length; j++) {
-                const productInfo = await PRODUCT.findOne({ product_id: detail[j]['product_fk'] })
+                let productInfo = await PRODUCT.findOne({ product_id: detail[j]['product_fk'] })
                 if (productInfo) {
+                    let size = await PRODUCTSIZE.findOne({ product_size_id: productInfo['product_size_fk'] })
+                    if(size){
+                        productInfo['size'] = size['product_size_title']
+                    }
+
                     detail[j]['productInfo'] = productInfo;
                 }
                 const sum = detail[j]['order_detail_paid_price'] * detail[j]['order_detail_qty'];

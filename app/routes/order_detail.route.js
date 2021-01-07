@@ -16,7 +16,7 @@ module.exports = app => {
 
     var router = require("express").Router();
 
-    router.use(authMiddleware.isAuth);
+    // router.use(authMiddleware.isAuth);
 
     router.get("/get-by-order", order.getByOrderId);
 

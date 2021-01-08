@@ -47,6 +47,13 @@ exports.rateByCustomer = async (req, res) => {
                     break
                 }
             }
+            for(let i = 0; i < orderCustomer.length; i++){
+                let proInfo = await PRODUCT.findOne({ product_id: orderCustomer[i]['order_detail']['product_fk'] })
+                if(proInfo && proInfo['product_name'] == product['product_name']){
+                    isRating = true
+                    break
+                }
+            }
         }
 
         if(isRating == false){

@@ -586,7 +586,6 @@ exports.getProductHot = async (req, res) => {
         { $unwind: '$product_size' }
 
     ]).then(async (data) => {
-
         for(let j = 0; j < data.length; j ++){
             for(let i = 0; i < 3; i++){
                 if (data[j]['product_id'] === orderDetail[i]['_id']) {

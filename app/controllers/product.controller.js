@@ -293,41 +293,44 @@ exports.getProductDiscount = async (req, res) => {
         },
         { $unwind: '$product_size' }
     ]).then(async (product) => {
-        prod.push(product[0])
         for(let i = 0; i < product.length; i++){
-            if (product[i]['product_unit_price'] > product[i]['product_paid_price'] && product[i]['product_status'] === true) {
-                let isDup = false
-                for(let j = 0; j < prod.length; j++){
-                    if(prod[j]['product_name'] == product[i]['product_name']){
-                        isDup = true
-                        break
+            if (product[i]['product_unit_price'] > product[i]['product_paid_price'] && product[i]['product_status'] == true) {
+                if(prod.length == 0){
+                    prod.push(product[i])
+                } else {
+                    let isDup = false
+                    for(let j = 0; j < prod.length; j++){
+                        if(prod[j]['product_name'] == product[i]['product_name']){
+                            isDup = true
+                            break
+                        }
                     }
-                }
-                if(isDup == false){
-                    const date = product[i]['createdAt'];
-                    product[i]['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
-    
-                    const rating = await RATING.aggregate([{ $match: { fk_product: product[i]['product_id'] } }])
-                    const comment = await COMMENT.aggregate([{ $match: { fk_product: product[i]['product_id'] } }])
-    
-                    let avgRating = 0;
-                    let countRating = 0;
-                    let countComment = 0;
-    
-                    if (rating) {
-                        countRating = rating.length
-                        let sumRating = 0;
-                        rating.forEach(item => {
-                            sumRating += item['product_rating_value'];
-                        });
-                        avgRating = sumRating / rating.length
+                    if(isDup == false){
+                        const date = product[i]['createdAt'];
+                        product[i]['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
+        
+                        const rating = await RATING.aggregate([{ $match: { fk_product: product[i]['product_id'] } }])
+                        const comment = await COMMENT.aggregate([{ $match: { fk_product: product[i]['product_id'] } }])
+        
+                        let avgRating = 0;
+                        let countRating = 0;
+                        let countComment = 0;
+        
+                        if (rating) {
+                            countRating = rating.length
+                            let sumRating = 0;
+                            rating.forEach(item => {
+                                sumRating += item['product_rating_value'];
+                            });
+                            avgRating = sumRating / rating.length
+                        }
+                        if (comment) countComment = comment.length
+        
+                        product[i]['countComment'] = countComment;
+                        product[i]['countRating'] = countRating;
+                        product[i]['avgRating'] = avgRating;
+                        prod.push(product[i]);
                     }
-                    if (comment) countComment = comment.length
-    
-                    product[i]['countComment'] = countComment;
-                    product[i]['countRating'] = countRating;
-                    product[i]['avgRating'] = avgRating;
-                    prod.push(product[i]);
                 }
             }
         };

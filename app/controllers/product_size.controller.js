@@ -14,7 +14,7 @@ exports.getAll = async(req, res) => {
 }
 
 exports.getByProductType = async(req, res) => {
-    await PRODUCTSIZE.find({product_type_fk: req.body.product_type}).then(data => {
+    await PRODUCTSIZE.find({product_type_fk: req.query.product_type}).then(data => {
         res.status(200).json(data);
     }).catch(err => {
         res.status(500).json({message: err.message || "Không tìm được size sản phẩm"})

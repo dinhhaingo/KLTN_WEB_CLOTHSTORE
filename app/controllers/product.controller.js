@@ -444,6 +444,12 @@ exports.getAllClient = async (req, res) => {
         },
         { $unwind: "$product_size" }
     ]).then(async (data) => {
+        if(!data[0]){
+            return res.status(400).json({
+                status: '01',
+                message: 'Danh mục sản phẩm rỗng!'
+            })
+        }
         let temp = []
         temp.push(data[0]);
 
@@ -675,7 +681,7 @@ exports.searchProduct = async (req, res) => {
 // Find a single Tutorial with an id
 exports.getById = async (req, res) => {
     const name = req.query.name;
-
+console.log(name)
     if (!name) {
         return res.status(500).json({ message: "Sản phẩm không xác định!" })
     }

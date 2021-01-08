@@ -1,6 +1,8 @@
 const { query } = require("express");
 const dbase = require("../models/index");
 const RATING = dbase.productRating;
+const ORDER = dbase.order;
+const ORDERDETAIL = dbase.orderDetail;
 const PRODUCT = dbase.product;
 const mongoose = require("mongoose");
 const jwtHelper = require('../helper/jwt.helper');
@@ -11,14 +13,49 @@ exports.rateByCustomer = async (req, res) => {
     const user = req.jwtDecoded;
     const { product_id, value, review } = req.body;
 
+    let isRating = false;
+
     if (!(product_id && value && review)) {
         res.status(400).send({ message: "Content can not be empty!" });
         return;
     }
     const product = await PRODUCT.findOne({ product_id: parseInt(product_id) })
     if (!product) {
-        return res.status(401).json({ message: "Sản phẩm không tồn tại" })
+        return res.status(401).json({ 
+            message: "Sản phẩm không tồn tại",
+            code: '02'
+        })
     } else {
+        const orderCustomer = await ORDER.aggregate([
+            { $match: { customer_fk: user.data.id } },
+            {
+                $lookup: 
+                {
+                    from: 'order_details',
+                    localField: 'order_id',
+                    foreignField: 'order_fk',
+                    as: 'order_detail'
+                }
+            },
+            { $unwind: '$order_detail' }
+        ])
+        
+        if(orderCustomer){
+            for(let i = 0; i < orderCustomer.length; i++){
+                if(orderCustomer[i]['order_detail']['product_fk'] == parseInt(product_id)){
+                    isRating = true
+                    break
+                }
+            }
+        }
+
+        if(isRating == false){
+            return res.status(401).json({
+                message: "Bạn phải mua hàng để đánh giá sản phẩm",
+                code: '01'
+            })
+        }
+
         const rating = await RATING.aggregate([
             {
                 $match:
@@ -33,7 +70,10 @@ exports.rateByCustomer = async (req, res) => {
         ]);
         let message = "";
         if (rating[0]) {
-            return res.status(500).json({message: "Bạn đã đánh giá sản phẩm, không thể đánh giá thêm!"})
+            return res.status(500).json({
+                message: "Bạn đã đánh giá sản phẩm, không thể đánh giá thêm!",
+                code: '03'
+            })
         } else {
             const newRating = new RATING({
                 product_rating_id: await dbase.autoIncrement('rating'),

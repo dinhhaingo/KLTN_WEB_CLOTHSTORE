@@ -444,42 +444,57 @@ exports.getAllClient = async (req, res) => {
         },
         { $unwind: "$product_size" }
     ]).then(async (data) => {
+        let temp = []
+        temp.push(data[0]);
+
         min = max = data[0]['product_paid_price'];
-        data.forEach(async product => {
-            if (min > product['product_paid_price']) min = product['product_paid_price'];
-            if (max < product['product_paid_price']) max = product['product_paid_price'];
-
-            const rating = await RATING.aggregate([{ $match: { fk_product: product['product_id'] } }])
-            const comment = await COMMENT.aggregate([{ $match: { fk_product: product['product_id'] } }])
-
-            let countComment = 0;
-            let avgRating = 0;
-            let countRating = 0;
-
-            if (comment) countComment = comment.length;
-            if (rating) {
-                countRating = rating.length
-                let sumRating = 0;
-                rating.forEach(item => {
-                    sumRating += item['product_rating_value'];
-                });
-                avgRating = sumRating / rating.length
+        for(let i = 0; i < data.length; i++){
+            let isDup = false
+            for(let j = 0; j < temp.length; j++){
+                if(data[i]['product_name'] == temp[j]['product_name']) {
+                    isDup = true
+                    break
+                }
             }
 
-            product['countComment'] = countComment;
-            product['countRating'] = countRating;
-            product['avgRating'] = avgRating;
+            if(isDup == false){
+                if (min > data[i]['product_paid_price']) min = data[i]['product_paid_price'];
+                if (max < data[i]['product_paid_price']) max = data[i]['product_paid_price'];
+    
+                const rating = await RATING.aggregate([{ $match: { fk_product: data[i]['product_id'] } }])
+                const comment = await COMMENT.aggregate([{ $match: { fk_product: data[i]['product_id'] } }])
+    
+                let countComment = 0;
+                let avgRating = 0;
+                let countRating = 0;
+    
+                if (comment) countComment = comment.length;
+                if (rating) {
+                    countRating = rating.length
+                    let sumRating = 0;
+                    rating.forEach(item => {
+                        sumRating += item['product_rating_value'];
+                    });
+                    avgRating = sumRating / rating.length
+                }
+    
+                data[i]['countComment'] = countComment;
+                data[i]['countRating'] = countRating;
+                data[i]['avgRating'] = avgRating;
+    
+                const date = data[i]['createdAt'];
+                data[i]['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
 
-            const date = product['createdAt'];
-            product['createdAt'] = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
-        });
+                temp.push(data[i]);
+            }
+        };
         if (value) {
-            data.forEach(product => {
+            temp.forEach(product => {
                 if (product['product_paid_price'] >= val.minValue && product['product_paid_price'] <= val.maxValue) {
                     prod.push(product)
                 }
             });
-        } else prod = data;
+        } else prod = temp;
 
         const count = prod.length;
         const pagData = prod.slice(offset, offset + limit);

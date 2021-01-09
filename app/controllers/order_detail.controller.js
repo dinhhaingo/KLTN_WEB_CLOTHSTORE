@@ -42,15 +42,30 @@ exports.getByOrderId = async (req, res) => {
             const detail = data[i]['order_detail'];
             let total = 0;
             for (let j = 0; j < detail.length; j++) {
-                const productInfo = await PRODUCT.findOne({ product_id: detail[j]['product_fk'] })
-                if (productInfo) {
-                    let size = await PRODUCTSIZE.findOne({ product_size_id: productInfo['product_size_fk'] })
-                    if(size){
-                        productInfo['size'] = size['product_size_title']
-                    }
+                const productInfo = await PRODUCT.aggregate([
+                    { $match: { product_id: detail[j]['product_fk'] } },
+                    {
+                        $lookup:
+                        {
+                            from: 'product_sizes',
+                            localField: 'product_size_fk',
+                            foreignField: 'product_size_id',
+                            as: 'size'
+                        }
+                    },
+                    { $unwind: '$size' }
+                ])
+                // const productInfo = await PRODUCT.findOne({ product_id: detail[j]['product_fk'] })
+                // if (productInfo) {
+                //     let size = await PRODUCTSIZE.findOne({ product_size_id: productInfo['product_size_fk'] })
+                //     if(size){
+                //         productInfo.size = size['product_size_title']
+                //     }
 
-                    detail[j]['productInfo'] = productInfo;
-                }
+                //     detail[j]['productInfo'] = productInfo;
+                // }
+                if(productInfo) detail[j]['productInfo'] = productInfo
+                
                 const sum = detail[j]['order_detail_paid_price'] * detail[j]['order_detail_qty'];
                 detail[j]['total'] = sum;
                 total += sum;
